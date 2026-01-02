@@ -188,7 +188,43 @@ export function ClientDashboardPage() {
                 <h3 className="text-lg font-semibold text-white">Modo Hostess</h3>
                 <p className="text-slate-400 text-sm mt-1">Escanear entradas en la puerta y asignar mesas.</p>
             </div>
+
+            <div>
+              <Card 
+                className="cursor-pointer hover:bg-slate-900 transition-all border-slate-800"
+                onClick={() => navigate("/client/timeline")} // Asegúrate de que esta ruta coincida con App.tsx
+              >
+                <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                  <div>
+                    <h3 className="font-bold text-lg">Itinerario</h3>
+                    <p className="text-sm text-slate-500">Gestiona los horarios del evento</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
         </div>
+
+        <div 
+                onClick={() => navigate('/client/location')}
+                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
+            >
+                <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center mb-4 group-hover:bg-pink-500/20 transition-colors">
+                    <QrCode className="w-5 h-5 text-pink-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Configurar Ubicación</h3>
+                <p className="text-slate-400 text-sm mt-1">Evento Principal</p>
+            </div>
+
+            <div 
+                onClick={() => navigate('/client/gift')}
+                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
+            >
+                <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center mb-4 group-hover:bg-pink-500/20 transition-colors">
+                    <QrCode className="w-5 h-5 text-pink-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Configurar Ubicación</h3>
+                <p className="text-slate-400 text-sm mt-1">Evento Principal</p>
+            </div>
 
       </main>
     </div>

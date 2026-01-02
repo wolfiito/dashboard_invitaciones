@@ -8,11 +8,13 @@ import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { guestService, GuestData, GuestMember } from "@/services/guestService";
+import { eventService, EventData } from "@/services/eventService";
 import QRCode from "react-qr-code"; // <--- IMPORTANTE
 
 export function ClientGuestsPage() {
   const navigate = useNavigate();
   const [guests, setGuests] = useState<GuestData[]>([]);
+  const [event, setEvent] = useState<EventData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const eventId = localStorage.getItem("clientEventId");
@@ -32,6 +34,18 @@ export function ClientGuestsPage() {
       navigate("/login");
       return;
     }
+
+    const fetchEventData = async () => {
+      try {
+        const eventData = await eventService.getById(eventId);
+        setEvent(eventData);
+      } catch (error) {
+        console.error("Error al cargar el evento:", error);
+      }
+    };
+
+    fetchEventData();
+
     const unsubscribe = guestService.subscribeByEvent(eventId, (data) => {
       setGuests(data);
     });
@@ -84,6 +98,15 @@ export function ClientGuestsPage() {
     }
   };
 
+  const shareInvitation = (guest: GuestData) => {
+    const invitationBaseUrl = event?.invitationUrl || "http://localhost:5174"; 
+    const cleanBaseUrl = invitationBaseUrl.endsWith('/') 
+      ? invitationBaseUrl.slice(0, -1) 
+      : invitationBaseUrl;
+    const uniqueLink = `${cleanBaseUrl}/?ticket=${guest.id}`;
+    const message = `Hola ${guest.familyName} 👋,\n\nLes enviamos su invitación digital personalizada.\nHemos reservado ${guest.members.length} lugares para ustedes.\n\nConfirmen aquí: ${uniqueLink}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  };
   // --- UTILS QR Y WHATSAPP ---
   
   // Genera el texto resumen de mesas (Lo que pediste)
@@ -97,21 +120,6 @@ export function ClientGuestsPage() {
         return `• ${m.name} (${mesa})`;
     }).join('\n');
     return summary;
-  };
-  const shareInvitation = (guest: GuestData) => {
-    // URL DE LA INVITACIÓN (Apunta a tu proyecto Vite de invitación)
-  // En producción, aquí pondrás tu dominio real (ej. bodaanayluis.com)
-  const invitationBaseUrl = "http://localhost:5174"; 
-
-    // CAMBIO CLAVE: Usamos 'ticket=' con el ID único, NO el nombre
-    // Esto hace que el link sea único e impredescible.
-    console.log(guest.id)
-    const uniqueLink = `${invitationBaseUrl}/?ticket=${guest.id}`;
-    
-    // El texto del mensaje sí lleva el nombre para que sea cálido
-    const message = `Hola ${guest.familyName} 👋,\n\nLes enviamos su invitación digital personalizada.\nHemos reservado ${guest.members.length} lugares para ustedes.\n\nConfirmen aquí: ${uniqueLink}`;
-    
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const shareTicket = (guest: GuestData) => {

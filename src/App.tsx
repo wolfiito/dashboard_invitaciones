@@ -8,6 +8,9 @@ import { ClientDashboardPage } from '@/pages/client/ClientDashboardPage';
 import { ClientGuestsPage } from '@/pages/client/ClientGuestsPage'; // <--- IMPORTANTE
 import { ClientTablesPage } from '@/pages/client/ClientTablesPage';
 import { HostessPage } from '@/pages/client/HostessPage';
+import { ClientTimelinePage } from "@/pages/client/ClientTimelinePage";
+import { ClientLocationPage } from '@/pages/client/ClientLocationPage';
+import { ClientGiftsPage } from "@/pages/client/ClientGiftsPage"
 
 function App() {
   return (
@@ -31,6 +34,11 @@ function App() {
 
         <Route path="/client/hostess" element={<HostessPage />} />
         
+        <Route path="/client/timeline" element={<ClientTimelinePage />} />
+
+        <Route path="/client/location" element={<ClientLocationPage />} />
+
+        <Route path="/client/gift" element={<ClientGiftsPage />} />
         {/* =========================================
             ZONA ADMIN (Con Sidebar)
            ========================================= */}

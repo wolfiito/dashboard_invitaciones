@@ -14,6 +14,30 @@ import {
   getDocs
 } from "firebase/firestore";
 
+export interface TimelineItem {
+  id: string;
+  time: string;
+  title: string;
+  description: string;
+  icon: string;
+}
+
+export interface GiftRegistry {
+  id: string;
+  store: string;
+  url: string;
+}
+
+export interface GiftsData {
+  bankAccount?: {
+    bankName: string;
+    clabe: string;
+    holder: string;
+  };
+  registries?: GiftRegistry[]; // Para links como Amazon, Liverpool, etc.
+  cashInstructions?: string;   // Para "Lluvia de sobres"
+}
+
 export interface EventData {
   id?: string;
   name: string;
@@ -21,8 +45,15 @@ export interface EventData {
   date: string;
   guests: number;
   status: 'active' | 'disabled' | 'pending' | 'finished'; // Agregamos 'disabled'
-  adminToken?: string; // <--- NUEVO: Token de seguridad
+  adminToken?: string; 
+  invitationUrl?: string;
+  timeline?: TimelineItem[];
   createdAt?: Timestamp;
+  locationName?: string;    // Ej: "Hacienda Los Arcángeles"
+  address?: string;         // Ej: "Calle Principal #123, San Miguel de Allende"
+  googleMapsUrl?: string;   // Link de Google Maps
+  wazeUrl?: string;
+  gifts?: GiftsData;
 }
 
 export const eventService = {
@@ -33,7 +64,7 @@ export const eventService = {
         ...data,
         status: "active",
         guests: 0,
-        // Generamos un token inicial automáticamente al crear
+        invitationUrl: data.invitationUrl || "",
         adminToken: crypto.randomUUID(), 
         createdAt: serverTimestamp(),
       });
