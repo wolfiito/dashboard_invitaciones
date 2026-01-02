@@ -1,318 +1,399 @@
-import { useEffect, useState } from "react";
+// src/pages/client/ClientGuestsPage.tsx
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Check, MessageCircle, X, QrCode } from "lucide-react";
+import { 
+  Plus, 
+  Trash2, 
+  Check, 
+  MessageCircle, 
+  X, 
+  QrCode, 
+  Search, 
+  User, 
+  Home, 
+  PlusCircle, 
+  ArrowLeft,
+  Copy // Icono para copiar vínculo
+} from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { guestService, GuestData, GuestType, GuestMember } from "@/services/guestService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { guestService, GuestData, GuestMember } from "@/services/guestService";
-import { eventService, EventData } from "@/services/eventService";
-import QRCode from "react-qr-code"; // <--- IMPORTANTE
+import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+import QRCode from "react-qr-code"; 
+import { cn } from "@/lib/utils";
 
 export function ClientGuestsPage() {
+  const { clientEvent } = useAuthStore();
   const navigate = useNavigate();
+
+  // --- ESTADOS DE LA LISTA ---
   const [guests, setGuests] = useState<GuestData[]>([]);
-  const [event, setEvent] = useState<EventData | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // --- ESTADOS DE CONTROL DE MODALES ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const eventId = localStorage.getItem("clientEventId");
-
-  // Estados del Formulario
   const [modalView, setModalView] = useState<'form' | 'success'>('form');
+  const [isLoading, setIsLoading] = useState(false);
   const [lastSavedGuest, setLastSavedGuest] = useState<GuestData | null>(null);
-  const [familyName, setFamilyName] = useState("");
-  const [currentMemberName, setCurrentMemberName] = useState("");
-  const [membersList, setMembersList] = useState<GuestMember[]>([]);
-
-  // Estado para el Modal de QR (Ticket)
   const [selectedTicketGuest, setSelectedTicketGuest] = useState<GuestData | null>(null);
 
+  // --- ESTADOS DEL FORMULARIO ---
+  const [type, setType] = useState<GuestType>('individual');
+  const [familyName, setFamilyName] = useState("");
+  const [tickets, setTickets] = useState(1);
+  const [memberNames, setMemberNames] = useState<string[]>([""]);
+
+  // --- EFECTO: SUSCRIPCIÓN EN TIEMPO REAL ---
   useEffect(() => {
-    if (!eventId) {
-      navigate("/login");
+    if (!clientEvent?.id) return;
+    const unsubscribe = guestService.subscribeByEvent(clientEvent.id, setGuests);
+    return () => unsubscribe();
+  }, [clientEvent?.id]);
+
+  // --- LÓGICA DE GESTIÓN DE MIEMBROS ---
+  const resetForm = () => {
+    setType('individual');
+    setFamilyName("");
+    setTickets(1);
+    setMemberNames([""]);
+    setModalView('form');
+  };
+
+  const handleAddMemberField = () => setMemberNames([...memberNames, ""]);
+  
+  const handleRemoveMemberField = (index: number) => {
+    if (memberNames.length > 1) {
+      setMemberNames(memberNames.filter((_, i) => i !== index));
+    }
+  };
+
+  // --- LÓGICA DE COPIAR VÍNCULO ---
+  const copyInvitationLink = (guest: GuestData) => {
+    if (!clientEvent?.invitationUrl) {
+      toast.error("El evento no tiene configurada una URL de invitación.");
       return;
     }
 
-    const fetchEventData = async () => {
-      try {
-        const eventData = await eventService.getById(eventId);
-        setEvent(eventData);
-      } catch (error) {
-        console.error("Error al cargar el evento:", error);
-      }
-    };
+    const cleanBaseUrl = clientEvent.invitationUrl.endsWith('/') 
+      ? clientEvent.invitationUrl.slice(0, -1) 
+      : clientEvent.invitationUrl;
 
-    fetchEventData();
-
-    const unsubscribe = guestService.subscribeByEvent(eventId, (data) => {
-      setGuests(data);
-    });
-    return () => unsubscribe();
-  }, [eventId, navigate]);
-
-  // ... (Funciones de agregar/borrar miembros siguen igual que antes) ...
-  const addMemberToList = () => {
-    if (!currentMemberName.trim()) return;
-    setMembersList([...membersList, { name: currentMemberName, isConfirmed: false, tableId: null }]);
-    setCurrentMemberName("");
+    const uniqueLink = `${cleanBaseUrl}/?ticket=${guest.id}`;
+    
+    navigator.clipboard.writeText(uniqueLink);
+    toast.success("Vínculo copiado al portapapeles");
   };
 
-  const removeMemberFromList = (index: number) => {
-    const newList = [...membersList];
-    newList.splice(index, 1);
-    setMembersList(newList);
-  };
-
-  const handleSaveGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!eventId) return;
-    if (membersList.length === 0) {
-        alert("Agrega al menos un integrante.");
-        return;
+  const handleSave = async () => {
+    if (!clientEvent?.id || !familyName.trim()) {
+      toast.error("Por favor completa los campos obligatorios");
+      return;
     }
+
     setIsLoading(true);
-    const newGuestData: Omit<GuestData, 'id'> = {
-        eventId,
-        familyName,
-        members: membersList,
-        status: 'pending'
+    let finalMembers: GuestMember[] = [];
+
+    if (type === 'individual') {
+      finalMembers = Array.from({ length: tickets }).map((_, i) => ({
+        name: i === 0 ? familyName : `Acompañante de ${familyName}`,
+        isConfirmed: false
+      }));
+    } else {
+      const filteredNames = memberNames.filter(n => n.trim() !== "");
+      if (filteredNames.length === 0) {
+        toast.error("Agrega al menos un integrante");
+        setIsLoading(false);
+        return;
+      }
+      finalMembers = filteredNames.map(name => ({ name, isConfirmed: false }));
+    }
+
+    const newGuest: Omit<GuestData, 'id'> = {
+      eventId: clientEvent.id,
+      type,
+      familyName,
+      members: finalMembers,
+      status: 'pending'
     };
+
     try {
-      const newId = await guestService.add(newGuestData);
-      setLastSavedGuest({ ...newGuestData, id: newId } as GuestData);
-      setModalView('success'); 
-      setFamilyName("");
-      setMembersList([]);
+      const newId = await guestService.add(newGuest);
+      setLastSavedGuest({ ...newGuest, id: newId } as GuestData);
+      setModalView('success');
+      toast.success("Guardado exitosamente");
     } catch (error) {
-      console.error(error);
+      toast.error("Error al guardar en el servidor" + error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDelete = async (guestId: string) => {
-    if (confirm("¿Eliminar familia?")) {
-      await guestService.delete(guestId);
+    if (confirm("¿Estás seguro de eliminar este invitado?")) {
+      try {
+        await guestService.delete(guestId);
+        toast.success("Eliminado");
+      } catch (e) {
+        toast.error("No se pudo eliminar" + e);
+      }
     }
   };
 
+  // --- LÓGICA DE COMPARTIR ---
   const shareInvitation = (guest: GuestData) => {
-    const invitationBaseUrl = event?.invitationUrl || "http://localhost:5174"; 
-    const cleanBaseUrl = invitationBaseUrl.endsWith('/') 
-      ? invitationBaseUrl.slice(0, -1) 
-      : invitationBaseUrl;
+    if (!clientEvent?.invitationUrl) {
+      toast.error("El evento no tiene configurada una URL de invitación.");
+      return;
+    }
+
+    const cleanBaseUrl = clientEvent.invitationUrl.endsWith('/') 
+      ? clientEvent.invitationUrl.slice(0, -1) 
+      : clientEvent.invitationUrl;
+
     const uniqueLink = `${cleanBaseUrl}/?ticket=${guest.id}`;
-    const message = `Hola ${guest.familyName} 👋,\n\nLes enviamos su invitación digital personalizada.\nHemos reservado ${guest.members.length} lugares para ustedes.\n\nConfirmen aquí: ${uniqueLink}`;
+    const message = `Hola ${guest.type === 'family' ? 'Familia ' : ''}${guest.familyName} 👋,\n\nNos encantaría que nos acompañen en nuestro evento.\nHemos reservado ${guest.members.length} lugares para ustedes.\n\nConfirmen su asistencia aquí: ${uniqueLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
-  };
-  // --- UTILS QR Y WHATSAPP ---
-  
-  // Genera el texto resumen de mesas (Lo que pediste)
-  const getTableSummary = (guest: GuestData) => {
-    // Agrupamos por mesa (esto es solo texto visual)
-    const summary = guest.members.map(m => {
-        // Aquí idealmente buscaríamos el nombre real de la mesa con el tableId
-        // Pero por ahora mostraremos "Mesa Asignada" o "Sin Asignar"
-        // (Para mostrar "Mesa 1" necesitamos cruzar datos con tables, lo haremos en la v2)
-        const mesa = m.tableId ? "Mesa Asignada" : "Por asignar"; 
-        return `• ${m.name} (${mesa})`;
-    }).join('\n');
-    return summary;
   };
 
   const shareTicket = (guest: GuestData) => {
-    // Este mensaje envía el resumen de mesas y el código "secreto" (ID)
-    const summary = getTableSummary(guest);
-    const message = `Hola ${guest.familyName}, aquí están sus accesos confirmados:\n\n${summary}\n\nPresenten este código al llegar: ${guest.id}`;
+    const summary = guest.members.map(m => `• ${m.name}: ${m.tableId ? 'Mesa asignada' : 'Por asignar'}`).join('\n');
+    const message = `Hola ${guest.familyName}, aquí tienes tus accesos confirmados:\n\n${summary}\n\nPresenta tu ID al llegar: ${guest.id}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setTimeout(() => setModalView('form'), 300);
-  };
+  const filteredGuests = guests.filter(g => 
+    g.familyName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/client/dashboard")} className="text-slate-400 hover:text-white">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver
-            </Button>
-            <h1 className="text-2xl font-bold">Lista de Invitados</h1>
-          </div>
-          <Button onClick={() => setIsModalOpen(true)} className="bg-primary text-white hover:bg-blue-600">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Familia
+    <div className="space-y-6 pb-24">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/client/dashboard")} className="text-slate-400">
+            <ArrowLeft size={20} />
           </Button>
+          <h1 className="text-3xl font-black text-white">Mis Invitados</h1>
         </div>
-
-        {/* Tabla */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <Table>
-            <TableHeader className="bg-slate-950">
-              <TableRow className="border-slate-800 hover:bg-slate-950">
-                <TableHead className="text-slate-400">Grupo</TableHead>
-                <TableHead className="text-slate-400">Integrantes</TableHead>
-                <TableHead className="text-slate-400">Total</TableHead>
-                <TableHead className="text-slate-400">Estado</TableHead>
-                <TableHead className="text-right text-slate-400">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {guests.length === 0 ? (
-                <TableRow className="border-slate-800">
-                  <TableCell colSpan={5} className="text-center py-12 text-slate-500">
-                    Sin registros.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                guests.map((guest) => (
-                  <TableRow key={guest.id} className="border-slate-800 hover:bg-slate-800/50">
-                    <TableCell className="font-medium text-slate-200">
-                      {guest.familyName}
-                    </TableCell>
-                    <TableCell className="text-slate-400 text-sm">
-                        <div className="flex flex-wrap gap-1">
-                            {guest.members && guest.members.slice(0, 3).map((m, i) => (
-                                <span key={i} className="text-xs border border-slate-700 px-1 rounded">{m.name}</span>
-                            ))}
-                            {guest.members && guest.members.length > 3 && <span className="text-xs text-slate-500">+{guest.members.length - 3}</span>}
-                        </div>
-                    </TableCell>
-                    <TableCell className="text-slate-300">
-                        {guest.members ? guest.members.length : 0}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={guest.status === 'confirmed' ? 'success' : guest.status === 'declined' ? 'destructive' : 'warning'}>
-                        {guest.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                             {/* BOTÓN QR / TICKET */}
-                             <Button 
-                                variant="ghost" size="sm" 
-                                onClick={() => setSelectedTicketGuest(guest)}
-                                className="text-slate-500 hover:text-blue-400"
-                                title="Ver Boleto QR"
-                             >
-                                <QrCode className="w-4 h-4" />
-                            </Button>
-                            
-                            {/* BOTÓN ELIMINAR */}
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(guest.id!)} className="text-slate-500 hover:text-red-400">
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+        
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <Input 
+              placeholder="Buscar por nombre..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-slate-900 border-slate-800"
+            />
+          </div>
+          <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="rounded-xl shadow-lg shadow-primary/20">
+            <Plus className="w-5 h-5" />
+          </Button>
         </div>
       </div>
 
-      {/* --- MODAL CREAR FAMILIA --- */}
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={modalView === 'form' ? "Registrar Familia" : "¡Grupo Creado!"} className="bg-slate-900 border-slate-700 text-white">
+      <div className="grid grid-cols-1 gap-3">
+        <AnimatePresence>
+          {filteredGuests.map((guest) => (
+            <motion.div 
+              key={guest.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <Card className="bg-slate-900/40 border-slate-800 overflow-hidden">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center",
+                      guest.type === 'family' ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
+                    )}>
+                      {guest.type === 'family' ? <Home size={24} /> : <User size={24} />}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white leading-tight">
+                        {guest.type === 'family' ? `Fam. ${guest.familyName}` : guest.familyName}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0 border-slate-700 text-slate-400">
+                          {guest.members.length} pases
+                        </Badge>
+                        <span className={cn(
+                          "w-2 h-2 rounded-full",
+                          guest.status === 'confirmed' ? "bg-green-500" : guest.status === 'declined' ? "bg-red-500" : "bg-yellow-500"
+                        )} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    {/* Botón Copiar Link */}
+                    <Button variant="ghost" size="sm" onClick={() => copyInvitationLink(guest)} className="text-slate-500 hover:text-primary">
+                      <Copy size={18} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedTicketGuest(guest)} className="text-slate-500 hover:text-blue-400">
+                      <QrCode size={18} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => shareInvitation(guest)} className="text-slate-500 hover:text-green-400">
+                      <MessageCircle size={18} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(guest.id!)} className="text-slate-500 hover:text-red-400">
+                      <Trash2 size={18} />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={modalView === 'form' ? "Nuevo Invitado" : "¡Invitado Agregado!"}
+      >
         {modalView === 'form' ? (
-            <form onSubmit={handleSaveGroup} className="space-y-6">
-                <div className="space-y-2">
-                    <Label className="text-slate-300">Nombre Familia</Label>
-                    <Input required placeholder="Ej. Familia Pérez" className="bg-slate-950 border-slate-700 text-white" value={familyName} onChange={e => setFamilyName(e.target.value)} />
-                </div>
-                <div className="space-y-3 bg-slate-800/30 p-4 rounded-lg border border-slate-800">
-                    <Label className="text-slate-300">Integrantes</Label>
-                    <div className="flex gap-2">
-                        <Input placeholder="Nombre..." className="bg-slate-950 border-slate-700 text-white" value={currentMemberName} onChange={e => setCurrentMemberName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMemberToList())} />
-                        <Button type="button" onClick={addMemberToList} className="bg-slate-800"><Plus className="w-4 h-4" /></Button>
-                    </div>
-                    <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
-                        {membersList.map((m, i) => (
-                            <div key={i} className="flex justify-between items-center p-2 rounded bg-slate-800 text-sm">
-                                <span>{m.name}</span>
-                                <button type="button" onClick={() => removeMemberFromList(i)} className="text-red-400"><X className="w-3 h-3" /></button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <div className="pt-2">
-                    <Button type="submit" disabled={isLoading} className="w-full bg-primary text-white hover:bg-blue-600">Guardar</Button>
-                </div>
-            </form>
-        ) : (
-            <div className="space-y-4 text-center">
-                <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4"><Check className="w-8 h-8" /></div>
-                <h3 className="text-xl font-bold">¡Listo!</h3>
-                <Button onClick={() => shareInvitation(lastSavedGuest!)} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white">
-                    <MessageCircle className="w-4 h-4 mr-2" /> Enviar Invitación
-                </Button>
-                <Button variant="ghost" onClick={() => setModalView('form')} className="w-full text-slate-500">Nuevo registro</Button>
+          <div className="space-y-6">
+            <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800">
+              <button 
+                onClick={() => setType('individual')}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all",
+                  type === 'individual' ? "bg-primary text-white" : "text-slate-500"
+                )}
+              >
+                <User size={18} /> Individual
+              </button>
+              <button 
+                onClick={() => setType('family')}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all",
+                  type === 'family' ? "bg-primary text-white" : "text-slate-500"
+                )}
+              >
+                <Home size={18} /> Familia
+              </button>
             </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase font-black text-slate-500 tracking-widest">
+                  {type === 'individual' ? 'Nombre del Invitado' : 'Apellidos de la Familia'}
+                </Label>
+                <Input 
+                  placeholder={type === 'individual' ? "Ej. Carlos Slim" : "Ej. Pérez García"}
+                  value={familyName}
+                  onChange={(e) => setFamilyName(e.target.value)}
+                  className="bg-slate-950 border-slate-800 h-12 text-white"
+                />
+              </div>
+
+              {type === 'individual' ? (
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase font-black text-slate-500 tracking-widest">Boletos / Lugares</Label>
+                  <div className="flex items-center gap-6 bg-slate-950 p-2 rounded-2xl border border-slate-800">
+                    <Button variant="ghost" onClick={() => setTickets(Math.max(1, tickets - 1))} className="text-xl font-bold">-</Button>
+                    <span className="flex-1 text-center text-2xl font-black text-white">{tickets}</span>
+                    <Button variant="ghost" onClick={() => setTickets(tickets + 1)} className="text-xl font-bold">+</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label className="text-xs uppercase font-black text-slate-500 tracking-widest">Integrantes</Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    {memberNames.map((name, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input 
+                          placeholder={`Nombre integrante ${index + 1}`}
+                          value={name}
+                          onChange={(e) => {
+                            const n = [...memberNames];
+                            n[index] = e.target.value;
+                            setMemberNames(n);
+                          }}
+                          className="bg-slate-950 border-slate-800"
+                        />
+                        <Button variant="ghost" size="sm" onClick={() => handleRemoveMemberField(index)} className="text-slate-600">
+                          <X size={18} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="ghost" onClick={handleAddMemberField} className="w-full border-2 border-dashed border-slate-800 text-slate-500 hover:text-primary">
+                    <PlusCircle size={16} className="mr-2" /> Añadir integrante
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Button onClick={handleSave} disabled={isLoading} className="w-full h-14 rounded-2xl font-bold text-lg">
+              {isLoading ? "Guardando..." : "Guardar Invitado"}
+            </Button>
+          </div>
+        ) : (
+          <div className="text-center space-y-6 py-4">
+            <div className="w-20 h-20 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <Check size={40} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-white">¡Invitado Agregado!</h3>
+              <p className="text-slate-400 text-sm">Ya puedes enviarle su invitación digital.</p>
+            </div>
+            
+            <div className="space-y-3">
+              <Button onClick={() => shareInvitation(lastSavedGuest!)} className="w-full h-14 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl font-bold">
+                <MessageCircle className="mr-2" /> Enviar por WhatsApp
+              </Button>
+              {/* Botón Copiar Link en Éxito */}
+              <Button onClick={() => copyInvitationLink(lastSavedGuest!)} variant="outline" className="w-full h-14 border-slate-700 text-slate-300 rounded-2xl font-bold">
+                <Copy className="mr-2" /> Copiar Vínculo
+              </Button>
+              <Button variant="ghost" onClick={() => resetForm()} className="w-full text-slate-500">
+                Registrar otro invitado
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 
-      {/* --- MODAL TICKET QR --- */}
-      {selectedTicketGuest && (
-        <Modal 
-            isOpen={!!selectedTicketGuest} 
-            onClose={() => setSelectedTicketGuest(null)} 
-            title="Boleto Digital de Acceso" 
-            className="bg-white text-slate-900 border-none max-w-sm" // Fondo blanco para que el QR resalte
-        >
-            <div className="flex flex-col items-center space-y-6 py-4">
-                
-                {/* Título Ticket */}
-                <div className="text-center space-y-1">
-                    <h3 className="text-2xl font-bold tracking-tight text-slate-900">{selectedTicketGuest.familyName}</h3>
-                    <p className="text-sm text-slate-500">Pases Autorizados: <span className="font-bold text-slate-900">{selectedTicketGuest.members.length}</span></p>
-                </div>
+      <AnimatePresence>
+        {selectedTicketGuest && (
+          <Modal isOpen={!!selectedTicketGuest} onClose={() => setSelectedTicketGuest(null)} title="Boleto Digital">
+            <div className="flex flex-col items-center space-y-6">
+              <div className="text-center">
+                <h3 className="text-2xl font-black text-white">{selectedTicketGuest.familyName}</h3>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{selectedTicketGuest.members.length} Pases Confirmados</p>
+              </div>
 
-                {/* QR CODE */}
-                <div className="p-4 bg-white rounded-xl shadow-lg border border-slate-100">
-                    <QRCode 
-                        value={selectedTicketGuest.id || "error"} 
-                        size={200}
-                        level="H" // Alta corrección de errores
-                    />
-                </div>
-                <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">ID: {selectedTicketGuest.id?.slice(0,8)}...</p>
+              <div className="p-6 bg-white rounded-3xl shadow-2xl">
+                <QRCode value={selectedTicketGuest.id || "error"} size={200} />
+              </div>
 
-                {/* DETALLE DE MESAS */}
-                <div className="w-full bg-slate-50 p-4 rounded-lg text-left space-y-2 border border-slate-100">
-                    <p className="text-xs font-bold text-slate-400 uppercase">Distribución de Asientos</p>
-                    <div className="text-sm space-y-1 text-slate-700 max-h-32 overflow-y-auto">
-                        {selectedTicketGuest.members.map((m, i) => (
-                            <div key={i} className="flex justify-between border-b border-slate-200 pb-1 last:border-0">
-                                <span>{m.name}</span>
-                                {/* Lógica visual rápida para mostrar si tiene mesa */}
-                                <span className={m.tableId ? "font-bold text-slate-900" : "text-slate-400 italic"}>
-                                    {m.tableId ? "Mesa Asignada" : "Sin Mesa"}
-                                </span>
-                            </div>
-                        ))}
+              <div className="w-full space-y-3 text-slate-900 bg-white p-4 rounded-xl">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Distribución de Asientos</p>
+                <div className="max-h-32 overflow-y-auto space-y-2">
+                  {selectedTicketGuest.members.map((m, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm">
+                      <span className="text-slate-800 font-medium">{m.name}</span>
+                      <span className="text-slate-400 text-xs">{m.tableId ? 'Mesa OK' : 'Por asignar'}</span>
                     </div>
+                  ))}
                 </div>
+              </div>
 
-                {/* ACCIONES */}
-                <div className="grid grid-cols-2 gap-3 w-full">
-                    <Button variant="outline" onClick={() => setSelectedTicketGuest(null)}>Cerrar</Button>
-                    <Button className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => shareTicket(selectedTicketGuest)}>
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Enviar
-                    </Button>
-                </div>
+              <Button onClick={() => shareTicket(selectedTicketGuest)} className="w-full h-12 rounded-xl">
+                <MessageCircle size={18} className="mr-2" /> Re-enviar Ticket
+              </Button>
             </div>
-        </Modal>
-      )}
-
+          </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

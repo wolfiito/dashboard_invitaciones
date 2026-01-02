@@ -1,232 +1,216 @@
+// src/pages/client/ClientDashboardPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Calendar, Users, MapPin, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { 
+  MapPin, 
+  CheckCircle2, 
+  UserPlus, 
+  QrCode, 
+  Clock,
+  ChevronRight,
+  AlertCircle,
+  UserX,
+  LucideIcon
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { eventService, EventData } from "@/services/eventService";
 import { guestService } from "@/services/guestService";
-import { QrCode } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { motion } from "framer-motion";
+
+// --- INTERFACES DE TIPADO ESTRICTO ---
+interface InsightCardProps {
+  title: string;
+  value: number | string;
+  total?: number;
+  icon: LucideIcon;
+  iconColor: string;
+  description: string;
+  showProgress?: boolean;
+  progressColor?: string;
+}
 
 export function ClientDashboardPage() {
   const navigate = useNavigate();
-  const [event, setEvent] = useState<EventData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { clientEvent } = useAuthStore();
   
-  // ESTADOS PARA CONTADORES
-  const [totalGuests, setTotalGuests] = useState(0);
-  const [confirmedGuests, setConfirmedGuests] = useState(0);
+  // Estado inicial de métricas
+  const [metrics, setMetrics] = useState({
+    total: 0,
+    confirmed: 0,
+    pending: 0,
+    declined: 0,
+    unassigned: 0
+  });
 
   useEffect(() => {
-    const eventId = localStorage.getItem("clientEventId");
-    
-    if (!eventId) {
-      navigate("/login");
-      return;
-    }
+    if (!clientEvent?.id) return;
 
-    // 1. Cargar datos del Evento
-    const fetchEvent = async () => {
-      try {
-        const data = await eventService.getById(eventId);
-        if (data) setEvent(data);
-        else navigate("/login");
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEvent();
+    const unsubscribeGuests = guestService.subscribeByEvent(clientEvent.id, (guests) => {
+      let total = 0;
+      let confirmed = 0;
+      let declined = 0;
+      let pending = 0;
+      let unassigned = 0;
 
-    // 2. Suscribirse a los Invitados
-    const unsubscribeGuests = guestService.subscribeByEvent(eventId, (guests) => {
-      
-      // SUMAR PERSONAS TOTALES (Esto está bien)
-      const totalCount = guests.reduce((sum, guest) => {
-        const count = guest.members ? guest.members.length : 0;
-        return sum + count;
-      }, 0);
-      setTotalGuests(totalCount);
+      guests.forEach(guest => {
+        const members = guest.members || [];
+        total += members.length;
 
-      // --- CORRECCIÓN AQUÍ ---
-      // SUMAR PERSONAS CONFIRMADAS REALES
-      const confirmedCount = guests.reduce((sum, guest) => {
-        if (!guest.members) return sum;
-        
-        // Antes sumábamos todo el grupo. Ahora filtramos uno por uno.
-        const membersGoing = guest.members.filter(m => m.isConfirmed).length;
-        
-        return sum + membersGoing;
-      }, 0);
-      setConfirmedGuests(confirmedCount);
+        // LÓGICA DE NEGOCIO CORREGIDA:
+        // 1. Si el grupo está pendiente, todos los miembros son pendientes.
+        if (guest.status === 'pending') {
+          pending += members.length;
+        } 
+        // 2. Si el grupo ya respondió (ya sea 'confirmed' o 'declined')
+        else {
+          members.forEach(member => {
+            if (member.isConfirmed) {
+              confirmed++;
+              // Solo contamos como "sin mesa" a los que SÍ confirmaron que van
+              if (!member.tableId) unassigned++;
+            } else {
+              // Si el grupo respondió pero este miembro no está confirmado, es un "No irá"
+              declined++;
+            }
+          });
+        }
+      });
+
+      setMetrics({ total, confirmed, pending, declined, unassigned });
     });
 
     return () => unsubscribeGuests();
-  }, [navigate]);
+  }, [clientEvent?.id]);
 
-  const handleLogout = () => {
-    if(confirm("¿Cerrar sesión del evento?")) {
-      localStorage.removeItem("clientEventId");
-      navigate("/login");
-    }
-  };
-
-  const getDaysRemaining = (dateString: string) => {
-    const eventDate = new Date(dateString);
-    const today = new Date();
-    const diffTime = eventDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  };
-
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
-  if (!event) return null;
-
-  const daysLeft = getDaysRemaining(event.date);
+  if (!clientEvent) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      
-      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <span className="font-bold text-lg tracking-tight">
-            Mi<span className="text-primary">Evento</span>
-          </span>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-400 hover:text-white">
-            <LogOut className="w-4 h-4 mr-2" />
-            Salir
-          </Button>
+    <div className="space-y-8 pb-12">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/20 p-6 rounded-3xl border border-slate-800">
+        <div>
+          <h1 className="text-3xl font-black text-white tracking-tight">Centro de Mando</h1>
+          <p className="text-secondary font-medium">Gestionando: {clientEvent.name}</p>
         </div>
-      </nav>
+        <button 
+          onClick={() => navigate('/client/guests')}
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-primary/20"
+        >
+          <UserPlus size={18} />
+          Añadir Invitados
+        </button>
+      </div>
 
-      <main className="max-w-5xl mx-auto p-4 space-y-8 py-8">
-        
-        {/* HERO */}
-        <div className="text-center space-y-4 py-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20">
-            <Calendar className="w-4 h-4" />
-            {new Date(event.date).toLocaleDateString('es-ES', { dateStyle: 'long', timeZone: 'UTC' })}
-          </div>
-          
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-            {event.name}
-          </h1>
-        </div>
+      {/* GRID DE INSIGHTS: MÉTRICAS REALES INDIVIDUALES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <InsightCard 
+          title="Confirmados"
+          value={metrics.confirmed}
+          total={metrics.total}
+          icon={CheckCircle2}
+          iconColor="text-green-400"
+          description="Irán al evento"
+          showProgress
+          progressColor="bg-green-500"
+        />
+        <InsightCard 
+          title="Pendientes"
+          value={metrics.pending}
+          icon={AlertCircle}
+          iconColor="text-yellow-400"
+          description="Sin respuesta aún"
+        />
+        <InsightCard 
+          title="No irán"
+          value={metrics.declined}
+          icon={UserX}
+          iconColor="text-red-400"
+          description="Lugares liberados"
+        />
+        <InsightCard 
+          title="Sin Mesa"
+          value={metrics.unassigned}
+          icon={MapPin}
+          iconColor="text-purple-400"
+          description="Confirmados sin asiento"
+        />
+      </div>
 
-        {/* GRID DE ESTADÍSTICAS REALES */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Cuenta Regresiva</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-white">{daysLeft}</span>
-                <span className="text-sm text-slate-500">días</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Total Personas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                <span className="text-2xl font-bold text-white">{totalGuests}</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Lugares asignados</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Confirmados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-400" />
-                <span className="text-2xl font-bold text-white">{confirmedGuests}</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Lugares confirmados</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* BOTONES DE ACCIÓN */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-            <div 
-                onClick={() => navigate('/client/guests')} 
-                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
-            >
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
-                    <Users className="w-5 h-5 text-blue-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Gestionar Invitados</h3>
-                <p className="text-slate-400 text-sm mt-1">Agrega familiares, envía invitaciones por WhatsApp y ve quién confirmó.</p>
-            </div>
-
-            <div 
-                onClick={() => navigate('/client/tables')}
-                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
-            >
-                <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
-                    <MapPin className="w-5 h-5 text-purple-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Organizar Mesas</h3>
-                <p className="text-slate-400 text-sm mt-1">Arrastra y suelta a tus invitados en las mesas del plano.</p>
-            </div>
-
-            <div 
-                onClick={() => navigate('/client/hostess')}
-                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
-            >
-                <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center mb-4 group-hover:bg-pink-500/20 transition-colors">
-                    <QrCode className="w-5 h-5 text-pink-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Modo Hostess</h3>
-                <p className="text-slate-400 text-sm mt-1">Escanear entradas en la puerta y asignar mesas.</p>
-            </div>
-
-            <div>
-              <Card 
-                className="cursor-pointer hover:bg-slate-900 transition-all border-slate-800"
-                onClick={() => navigate("/client/timeline")} // Asegúrate de que esta ruta coincida con App.tsx
-              >
-                <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                  <div>
-                    <h3 className="font-bold text-lg">Itinerario</h3>
-                    <p className="text-sm text-slate-500">Gestiona los horarios del evento</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-        </div>
-
+      {/* OPERATIVO */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div 
-                onClick={() => navigate('/client/location')}
-                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
-            >
-                <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center mb-4 group-hover:bg-pink-500/20 transition-colors">
-                    <QrCode className="w-5 h-5 text-pink-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Configurar Ubicación</h3>
-                <p className="text-slate-400 text-sm mt-1">Evento Principal</p>
+          onClick={() => navigate('/client/hostess')}
+          className="lg:col-span-2 group relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-pink-500/10 via-slate-900 to-slate-900 border border-pink-500/20 cursor-pointer hover:border-pink-500/40 transition-all"
+        >
+          <div className="relative z-10 flex justify-between items-center">
+            <div className="space-y-3">
+              <div className="h-12 w-12 rounded-2xl bg-pink-500/20 flex items-center justify-center text-pink-400">
+                <QrCode size={28} />
+              </div>
+              <h3 className="text-2xl font-black text-white">Modo Hostess</h3>
+              <p className="text-sm text-slate-400 max-w-md">
+                Acceso rápido para el día del evento. Escanea QR y confirma llegadas.
+              </p>
             </div>
+            <ChevronRight className="hidden md:block text-slate-700 group-hover:text-pink-400 group-hover:translate-x-2 transition-all" size={48} />
+          </div>
+        </div>
 
-            <div 
-                onClick={() => navigate('/client/gift')}
-                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group"
-            >
-                <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center mb-4 group-hover:bg-pink-500/20 transition-colors">
-                    <QrCode className="w-5 h-5 text-pink-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Configurar Ubicación</h3>
-                <p className="text-slate-400 text-sm mt-1">Evento Principal</p>
+        <div className="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 flex flex-col justify-between">
+          <div className="space-y-4">
+            <h3 className="font-bold text-white flex items-center gap-2">
+              <Clock size={18} className="text-primary" />
+              Próximo Hito
+            </h3>
+            <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700">
+              <p className="text-xs font-black text-primary uppercase tracking-widest mb-1">Cargando...</p>
+              <p className="text-sm font-bold text-white">Revisa el itinerario</p>
             </div>
-
-      </main>
+          </div>
+          <button 
+            onClick={() => navigate('/client/timeline')}
+            className="mt-6 w-full py-3 rounded-xl bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors uppercase"
+          >
+            Ver Itinerario
+          </button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function InsightCard({ title, value, total, icon: Icon, iconColor, description, showProgress, progressColor }: InsightCardProps) {
+  const percentage = total ? (Number(value) / total) * 100 : 0;
+
+  return (
+    <Card className="bg-slate-900/40 border-slate-800 overflow-hidden relative group hover:border-slate-700 transition-colors">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] flex items-center justify-between">
+          {title}
+          <Icon className={iconColor} size={16} />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl font-black text-white tracking-tighter">{value}</span>
+          {total && <span className="text-xs text-slate-500 font-bold">/ {total}</span>}
+        </div>
+        
+        {showProgress && total ? (
+          <div className="space-y-1.5">
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${percentage}%` }}
+                className={`h-full ${progressColor} shadow-[0_0_10px_rgba(34,197,94,0.2)]`}
+              />
+            </div>
+            <p className="text-[10px] text-slate-500 font-bold text-right">{percentage.toFixed(0)}% DEL TOTAL</p>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 font-medium leading-tight">{description}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
