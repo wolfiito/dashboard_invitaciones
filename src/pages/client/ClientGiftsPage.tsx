@@ -1,131 +1,100 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Gift, Landmark, Plus, Trash2, 
-  Save, Loader2,Info 
+  Save, Loader2
 } from "lucide-react";
+import { toast } from "sonner";
 
-// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { eventService, EventData, GiftRegistry } from "@/services/eventService";
+import { eventService, GiftRegistry } from "@/services/eventService";
+import { useAuthStore } from "@/store/useAuthStore"; // <--- IMPORTAR
 
 export function ClientGiftsPage() {
   const navigate = useNavigate();
-  const [event, setEvent] = useState<EventData | null>(null);
-  const [loading, setLoading] = useState(true);
+  // USAMOS STORE
+  const { clientEvent, updateCurrentEvent } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
-  const eventId = localStorage.getItem("clientEventId");
 
-  useEffect(() => {
-    if (!eventId) {
-      navigate("/login");
-      return;
-    }
-    const fetchEvent = async () => {
-      const data = await eventService.getById(eventId);
-      if (data) setEvent(data);
-      setLoading(false);
-    };
-    fetchEvent();
-  }, [eventId, navigate]);
+  if (!clientEvent) {
+      setTimeout(() => navigate("/login"), 100);
+      return null;
+  }
 
-  // HELPER: Actualización segura de la cuenta bancaria sin Non-Null Assertions (!)
+  // HELPER: Actualiza el store localmente
   const updateBankAccount = (field: 'bankName' | 'clabe' | 'holder', value: string) => {
-    setEvent(prev => {
-      if (!prev) return null;
-      const currentGifts = prev.gifts || {};
+      const currentGifts = clientEvent.gifts || {};
       const currentBank = currentGifts.bankAccount || { bankName: "", clabe: "", holder: "" };
-
-      return {
-        ...prev,
+      
+      updateCurrentEvent({
         gifts: {
           ...currentGifts,
-          bankAccount: {
-            ...currentBank,
-            [field]: value
-          }
+          bankAccount: { ...currentBank, [field]: value }
         }
-      };
-    });
+      });
   };
 
   const handleAddRegistry = () => {
-    setEvent(prev => {
-      if (!prev) return null;
-      const newRegistry: GiftRegistry = { id: crypto.randomUUID(), store: "", url: "" };
-      const currentGifts = prev.gifts || {};
-      const currentRegistries = currentGifts.registries || [];
-      
-      return {
-        ...prev,
-        gifts: {
-          ...currentGifts,
-          registries: [...currentRegistries, newRegistry]
-        }
-      };
+    const newRegistry: GiftRegistry = { id: crypto.randomUUID(), store: "", url: "" };
+    const currentGifts = clientEvent.gifts || {};
+    const currentRegistries = currentGifts.registries || [];
+
+    updateCurrentEvent({
+      gifts: {
+        ...currentGifts,
+        registries: [...currentRegistries, newRegistry]
+      }
     });
   };
 
   const handleRemoveRegistry = (id: string) => {
-    setEvent(prev => {
-      if (!prev || !prev.gifts?.registries) return prev;
-      return {
-        ...prev,
-        gifts: {
-          ...prev.gifts,
-          registries: prev.gifts.registries.filter(r => r.id !== id)
-        }
-      };
+    if (!clientEvent.gifts?.registries) return;
+    updateCurrentEvent({
+      gifts: {
+        ...clientEvent.gifts,
+        registries: clientEvent.gifts.registries.filter(r => r.id !== id)
+      }
     });
   };
 
   const updateRegistry = (idx: number, field: 'store' | 'url', value: string) => {
-    setEvent(prev => {
-      if (!prev || !prev.gifts?.registries) return prev;
-      const newRegs = [...prev.gifts.registries];
-      newRegs[idx] = { ...newRegs[idx], [field]: value };
-      return {
-        ...prev,
-        gifts: { ...prev.gifts, registries: newRegs }
-      };
+    if (!clientEvent.gifts?.registries) return;
+    const newRegs = [...clientEvent.gifts.registries];
+    newRegs[idx] = { ...newRegs[idx], [field]: value };
+    
+    updateCurrentEvent({
+      gifts: { ...clientEvent.gifts, registries: newRegs }
     });
   };
 
   const handleSave = async () => {
-    if (!event?.id) return;
+    if (!clientEvent.id) return;
     setIsSaving(true);
     try {
-      // SANITIZACIÓN: Limpiamos undefined antes de enviar a Firebase
       const giftsToSave = {
         bankAccount: {
-          bankName: event.gifts?.bankAccount?.bankName || "",
-          clabe: event.gifts?.bankAccount?.clabe || "",
-          holder: event.gifts?.bankAccount?.holder || "",
+          bankName: clientEvent.gifts?.bankAccount?.bankName || "",
+          clabe: clientEvent.gifts?.bankAccount?.clabe || "",
+          holder: clientEvent.gifts?.bankAccount?.holder || "",
         },
-        registries: event.gifts?.registries || [],
-        cashInstructions: event.gifts?.cashInstructions || ""
+        registries: clientEvent.gifts?.registries || [],
+        cashInstructions: clientEvent.gifts?.cashInstructions || ""
       };
 
-      await eventService.update(event.id, { gifts: giftsToSave });
-      alert("🎁 Datos de regalos actualizados correctamente.");
+      await eventService.update(clientEvent.id, { gifts: giftsToSave });
+      toast.success("Mesa de regalos actualizada");
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar los cambios.");
+      toast.error("Error al guardar los cambios");
     } finally {
       setIsSaving(false);
     }
   };
-
-  if (loading) return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
-      <Loader2 className="animate-spin mr-2" /> Cargando configuración de regalos...
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 pb-24">
@@ -155,7 +124,7 @@ export function ClientGiftsPage() {
                 <Label className="text-slate-400">Banco</Label>
                 <Input 
                   placeholder="Ej: BBVA, Santander..."
-                  value={event?.gifts?.bankAccount?.bankName || ""} 
+                  value={clientEvent.gifts?.bankAccount?.bankName || ""} 
                   onChange={e => updateBankAccount('bankName', e.target.value)}
                   className="bg-slate-950 border-slate-700" 
                 />
@@ -164,7 +133,7 @@ export function ClientGiftsPage() {
                 <Label className="text-slate-400">CLABE (18 dígitos)</Label>
                 <Input 
                   placeholder="0000 0000 0000 0000 00"
-                  value={event?.gifts?.bankAccount?.clabe || ""} 
+                  value={clientEvent.gifts?.bankAccount?.clabe || ""} 
                   onChange={e => updateBankAccount('clabe', e.target.value)}
                   className="bg-slate-950 border-slate-700 font-mono" 
                 />
@@ -174,7 +143,7 @@ export function ClientGiftsPage() {
               <Label className="text-slate-400">Nombre del Titular</Label>
               <Input 
                 placeholder="Nombre tal cual aparece en el banco"
-                value={event?.gifts?.bankAccount?.holder || ""} 
+                value={clientEvent.gifts?.bankAccount?.holder || ""} 
                 onChange={e => updateBankAccount('holder', e.target.value)}
                 className="bg-slate-950 border-slate-700" 
               />
@@ -190,79 +159,42 @@ export function ClientGiftsPage() {
                 <Gift size={20} />
                 <h2 className="font-semibold uppercase tracking-wider text-sm">Links Externos</h2>
               </div>
-              <Button 
-                onClick={handleAddRegistry} 
-                variant="outline" 
-                size="sm" 
-                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-              >
+              <Button onClick={handleAddRegistry} variant="outline" size="sm" className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10">
                 <Plus size={16} className="mr-1" /> Añadir tienda
               </Button>
             </div>
             
             <div className="space-y-4">
-              {event?.gifts?.registries?.map((reg, idx) => (
+              {clientEvent.gifts?.registries?.map((reg, idx) => (
                 <div key={reg.id} className="flex flex-col sm:flex-row gap-4 items-end bg-slate-950/40 p-4 rounded-xl border border-slate-800 group relative">
                   <div className="w-full sm:w-1/3 space-y-2">
                     <Label className="text-xs text-slate-500">Tienda / Plataforma</Label>
                     <Input 
-                      placeholder="Ej: Amazon, Liverpool..." 
+                      placeholder="Ej: Amazon..." 
                       value={reg.store} 
                       onChange={e => updateRegistry(idx, 'store', e.target.value)}
                       className="bg-slate-950 border-slate-700" 
                     />
                   </div>
                   <div className="w-full sm:flex-1 space-y-2">
-                    <Label className="text-xs text-slate-500">URL de la mesa</Label>
+                    <Label className="text-xs text-slate-500">URL</Label>
                     <Input 
-                      placeholder="https://www.tienda.com/mesa/tu-boda" 
                       value={reg.url} 
                       onChange={e => updateRegistry(idx, 'url', e.target.value)}
                       className="bg-slate-950 border-slate-700 text-xs font-mono" 
                     />
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => handleRemoveRegistry(reg.id)}
-                    className="text-slate-600 hover:text-red-400 transition-colors"
-                  >
+                  <Button variant="ghost" onClick={() => handleRemoveRegistry(reg.id)} className="text-slate-600 hover:text-red-400">
                     <Trash2 size={18} />
                   </Button>
                 </div>
               ))}
-
-              {(!event?.gifts?.registries || event.gifts.registries.length === 0) && (
-                <div className="text-center py-8 text-slate-600 italic text-sm">
-                  No has añadido mesas de regalos externas.
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Tips UX */}
-        <div className="flex gap-3 bg-blue-500/5 border border-blue-500/10 p-4 rounded-xl">
-          <Info className="w-5 h-5 text-blue-400 shrink-0" />
-          <p className="text-xs text-slate-400 leading-relaxed">
-            <b>Tip Pro:</b> En la invitación, los invitados verán un botón de "Copiar" junto a tu CLABE para que no tengan que escribir los 18 dígitos manualmente en su app bancaria.
-          </p>
-        </div>
-
-        {/* Acciones */}
-        <Button 
-          onClick={handleSave} 
-          disabled={isSaving} 
-          className="w-full bg-blue-600 hover:bg-blue-500 h-14 font-bold text-lg shadow-lg shadow-blue-900/20"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="animate-spin mr-2" /> Guardando...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 w-5 h-5" /> Guardar Todo
-            </>
-          )}
+        <Button onClick={handleSave} disabled={isSaving} className="w-full bg-blue-600 hover:bg-blue-500 h-14 font-bold text-lg">
+          {isSaving ? <><Loader2 className="animate-spin mr-2" /> Guardando...</> : <><Save className="mr-2 w-5 h-5" /> Guardar Todo</>}
         </Button>
       </div>
     </div>
