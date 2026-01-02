@@ -5,19 +5,22 @@ import {
   MapPin, 
   CheckCircle2, 
   UserPlus, 
-  QrCode, 
-  Clock,
-  ChevronRight,
   AlertCircle,
   UserX,
-  LucideIcon
+  LucideIcon,
+  User
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { guestService } from "@/services/guestService";
+import { guestService, GuestData } from "@/services/guestService";
 import { useAuthStore } from "@/store/useAuthStore";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Modal } from "@/components/ui/modal"; // Asumiendo que tienes este componente
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-// --- INTERFACES DE TIPADO ESTRICTO ---
+// Tipos para las categorías
+type DashboardCategory = 'confirmed' | 'pending' | 'declined' | 'unassigned' | null;
+
 interface InsightCardProps {
   title: string;
   value: number | string;
@@ -27,13 +30,15 @@ interface InsightCardProps {
   description: string;
   showProgress?: boolean;
   progressColor?: string;
+  onClick: () => void; // Nueva prop para manejar el clic
 }
 
 export function ClientDashboardPage() {
   const navigate = useNavigate();
   const { clientEvent } = useAuthStore();
   
-  // Estado inicial de métricas
+  // Estado de datos
+  const [guests, setGuests] = useState<GuestData[]>([]);
   const [metrics, setMetrics] = useState({
     total: 0,
     confirmed: 0,
@@ -42,34 +47,33 @@ export function ClientDashboardPage() {
     unassigned: 0
   });
 
+  // Estado del Modal de Detalles
+  const [selectedCategory, setSelectedCategory] = useState<DashboardCategory>(null);
+
   useEffect(() => {
     if (!clientEvent?.id) return;
 
-    const unsubscribeGuests = guestService.subscribeByEvent(clientEvent.id, (guests) => {
+    const unsubscribeGuests = guestService.subscribeByEvent(clientEvent.id, (data) => {
+      setGuests(data); // Guardamos la lista completa para filtrar después
+
       let total = 0;
       let confirmed = 0;
       let declined = 0;
       let pending = 0;
       let unassigned = 0;
 
-      guests.forEach(guest => {
+      data.forEach(guest => {
         const members = guest.members || [];
         total += members.length;
 
-        // LÓGICA DE NEGOCIO CORREGIDA:
-        // 1. Si el grupo está pendiente, todos los miembros son pendientes.
         if (guest.status === 'pending') {
           pending += members.length;
-        } 
-        // 2. Si el grupo ya respondió (ya sea 'confirmed' o 'declined')
-        else {
+        } else {
           members.forEach(member => {
             if (member.isConfirmed) {
               confirmed++;
-              // Solo contamos como "sin mesa" a los que SÍ confirmaron que van
               if (!member.tableId) unassigned++;
             } else {
-              // Si el grupo respondió pero este miembro no está confirmado, es un "No irá"
               declined++;
             }
           });
@@ -82,135 +86,209 @@ export function ClientDashboardPage() {
     return () => unsubscribeGuests();
   }, [clientEvent?.id]);
 
+  // --- LÓGICA DE FILTRADO PARA EL MODAL ---
+  const getCategoryDetails = () => {
+    if (!selectedCategory) return { title: "", list: [] };
+
+    let list: { name: string; subtitle: string }[] = [];
+
+    switch (selectedCategory) {
+      case 'confirmed':
+        list = guests.flatMap(g => 
+          g.members.filter(m => m.isConfirmed).map(m => ({
+            name: m.name,
+            subtitle: g.type === 'family' ? `Fam. ${g.familyName}` : 'Individual'
+          }))
+        );
+        return { title: "Invitados Confirmados", list, color: "text-green-500" };
+
+      case 'pending':
+        // En pendientes mostramos el grupo/familia entero generalmente
+        list = guests.filter(g => g.status === 'pending').flatMap(g => 
+          g.members.map(m => ({
+            name: m.name,
+            subtitle: `Esperando respuesta de Fam. ${g.familyName}`
+          }))
+        );
+        return { title: "Pendientes de Respuesta", list, color: "text-yellow-500" };
+
+      case 'declined':
+        // Incluye grupos declinados completos O miembros individuales que dijeron no
+        list = [];
+        guests.forEach(g => {
+          if (g.status === 'declined') {
+             g.members.forEach(m => list.push({ name: m.name, subtitle: `Fam. ${g.familyName} (Declinó)` }));
+          } else if (g.status === 'confirmed') {
+             // Grupo va, pero este miembro no
+             g.members.filter(m => !m.isConfirmed).forEach(m => 
+                list.push({ name: m.name, subtitle: `Fam. ${g.familyName} (No asistirá)` })
+             );
+          }
+        });
+        return { title: "No Asistirán", list, color: "text-red-500" };
+
+      case 'unassigned':
+        list = guests.flatMap(g => 
+          g.members.filter(m => m.isConfirmed && !m.tableId).map(m => ({
+            name: m.name,
+            subtitle: "Falta asignar mesa"
+          }))
+        );
+        return { title: "Sin Mesa Asignada", list, color: "text-purple-500" };
+        
+      default:
+        return { title: "", list: [], color: "" };
+    }
+  };
+
+  const modalContent = getCategoryDetails();
+
   if (!clientEvent) return null;
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-20">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/20 p-6 rounded-3xl border border-slate-800">
+      <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Centro de Mando</h1>
-          <p className="text-secondary font-medium">Gestionando: {clientEvent.name}</p>
+          <h1 className="text-3xl font-black text-white tracking-tight">Hola, {clientEvent.name}</h1>
+          <p className="text-slate-400 font-medium text-sm">Toca las tarjetas para ver detalles</p>
         </div>
+        
         <button 
           onClick={() => navigate('/client/guests')}
-          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-primary/20"
+          className="w-full bg-primary hover:bg-primary/90 text-white p-4 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-95"
         >
-          <UserPlus size={18} />
-          Añadir Invitados
+          <UserPlus size={20} />
+          Gestionar Invitados
         </button>
       </div>
 
-      {/* GRID DE INSIGHTS: MÉTRICAS REALES INDIVIDUALES */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* GRID 2x2 INTERACTIVO */}
+      <div className="grid grid-cols-2 gap-4">
         <InsightCard 
+          onClick={() => setSelectedCategory('confirmed')}
           title="Confirmados"
           value={metrics.confirmed}
           total={metrics.total}
           icon={CheckCircle2}
           iconColor="text-green-400"
-          description="Irán al evento"
+          description="Ver lista"
           showProgress
           progressColor="bg-green-500"
         />
+        
         <InsightCard 
+          onClick={() => setSelectedCategory('pending')}
           title="Pendientes"
           value={metrics.pending}
           icon={AlertCircle}
           iconColor="text-yellow-400"
-          description="Sin respuesta aún"
+          description="Ver lista"
         />
+        
         <InsightCard 
-          title="No irán"
+          onClick={() => setSelectedCategory('declined')}
+          title="No asistirán"
           value={metrics.declined}
           icon={UserX}
           iconColor="text-red-400"
-          description="Lugares liberados"
+          description="Ver lista"
         />
+        
         <InsightCard 
+          onClick={() => setSelectedCategory('unassigned')}
           title="Sin Mesa"
           value={metrics.unassigned}
           icon={MapPin}
           iconColor="text-purple-400"
-          description="Confirmados sin asiento"
+          description="Ver lista"
         />
       </div>
 
-      {/* OPERATIVO */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div 
-          onClick={() => navigate('/client/hostess')}
-          className="lg:col-span-2 group relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-pink-500/10 via-slate-900 to-slate-900 border border-pink-500/20 cursor-pointer hover:border-pink-500/40 transition-all"
-        >
-          <div className="relative z-10 flex justify-between items-center">
-            <div className="space-y-3">
-              <div className="h-12 w-12 rounded-2xl bg-pink-500/20 flex items-center justify-center text-pink-400">
-                <QrCode size={28} />
-              </div>
-              <h3 className="text-2xl font-black text-white">Modo Hostess</h3>
-              <p className="text-sm text-slate-400 max-w-md">
-                Acceso rápido para el día del evento. Escanea QR y confirma llegadas.
-              </p>
-            </div>
-            <ChevronRight className="hidden md:block text-slate-700 group-hover:text-pink-400 group-hover:translate-x-2 transition-all" size={48} />
-          </div>
-        </div>
-
-        <div className="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 flex flex-col justify-between">
-          <div className="space-y-4">
-            <h3 className="font-bold text-white flex items-center gap-2">
-              <Clock size={18} className="text-primary" />
-              Próximo Hito
-            </h3>
-            <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700">
-              <p className="text-xs font-black text-primary uppercase tracking-widest mb-1">Cargando...</p>
-              <p className="text-sm font-bold text-white">Revisa el itinerario</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => navigate('/client/timeline')}
-            className="mt-6 w-full py-3 rounded-xl bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors uppercase"
+      {/* MODAL DE DETALLES */}
+      <AnimatePresence>
+        {selectedCategory && (
+          <Modal 
+            isOpen={!!selectedCategory} 
+            onClose={() => setSelectedCategory(null)} 
+            title={modalContent.title}
           >
-            Ver Itinerario
-          </button>
-        </div>
-      </div>
+            <div className="space-y-4">
+              <div className={cn("text-xs font-bold uppercase tracking-widest mb-4", modalContent.color)}>
+                {modalContent.list.length} Personas en total
+              </div>
+
+              {/* LISTA SCROLLEABLE */}
+              <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-1">
+                {modalContent.list.length > 0 ? (
+                  modalContent.list.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-500">
+                        <User size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{item.name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{item.subtitle}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-slate-500 text-sm">
+                    No hay personas en esta categoría.
+                  </div>
+                )}
+              </div>
+
+              <Button onClick={() => setSelectedCategory(null)} className="w-full h-12 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold">
+                Cerrar
+              </Button>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function InsightCard({ title, value, total, icon: Icon, iconColor, description, showProgress, progressColor }: InsightCardProps) {
+// COMPONENTE TARJETA ACTUALIZADO
+function InsightCard({ onClick, title, value, total, icon: Icon, iconColor, showProgress, progressColor }: InsightCardProps) {
   const percentage = total ? (Number(value) / total) * 100 : 0;
 
   return (
-    <Card className="bg-slate-900/40 border-slate-800 overflow-hidden relative group hover:border-slate-700 transition-colors">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] flex items-center justify-between">
-          {title}
-          <Icon className={iconColor} size={16} />
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-black text-white tracking-tighter">{value}</span>
-          {total && <span className="text-xs text-slate-500 font-bold">/ {total}</span>}
-        </div>
-        
-        {showProgress && total ? (
-          <div className="space-y-1.5">
-            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${percentage}%` }}
-                className={`h-full ${progressColor} shadow-[0_0_10px_rgba(34,197,94,0.2)]`}
-              />
-            </div>
-            <p className="text-[10px] text-slate-500 font-bold text-right">{percentage.toFixed(0)}% DEL TOTAL</p>
+    <motion.div whileTap={{ scale: 0.98 }}>
+      <Card 
+        onClick={onClick}
+        className="bg-slate-900/40 border-slate-800 overflow-hidden relative group hover:border-slate-600 transition-all cursor-pointer h-full active:bg-slate-800/60"
+      >
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between mb-1">
+            {title}
+            <Icon className={iconColor} size={16} />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0 space-y-2">
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-black text-white tracking-tighter">{value}</span>
+            {total && <span className="text-[10px] text-slate-500 font-bold">/ {total}</span>}
           </div>
-        ) : (
-          <p className="text-xs text-slate-500 font-medium leading-tight">{description}</p>
-        )}
-      </CardContent>
-    </Card>
+          
+          {showProgress && total ? (
+            <div className="space-y-1">
+              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${percentage}%` }}
+                  className={`h-full ${progressColor}`}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-primary">
+              <p className="text-[10px] font-bold leading-tight truncate">Ver detalles</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }

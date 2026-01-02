@@ -2,9 +2,7 @@
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { ADMIN_NAV, CLIENT_NAV } from '@/config/navigation';
-import { Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAuthStore } from '@/store/useAuthStore';
+import { Menu } from 'lucide-react'; // Importamos icono de menú
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -12,8 +10,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, role }: DashboardLayoutProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
-  const { clientEvent } = useAuthStore();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navConfig = {
     admin: {
@@ -23,7 +20,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
     },
     client: {
       items: CLIENT_NAV,
-      title: clientEvent?.name || "Gestor",
+      title: "Gestor",
       subtitle: "Boda"
     }
   };
@@ -31,42 +28,34 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const currentNav = navConfig[role];
 
   return (
-    <div className="min-h-screen bg-background text-text font-sans flex flex-col lg:flex-row">
-      {/* Botón de Menú Móvil (Solo visible en pantallas < lg) */}
-      <header className="lg:hidden h-16 border-b border-slate-800 bg-surface flex items-center justify-between px-4 sticky top-0 z-40">
+    <div className="min-h-screen bg-black text-slate-200 font-sans flex flex-col lg:flex-row">
+      
+      {/* HEADER MÓVIL (Solo visible en pantallas pequeñas) */}
+      <header className="lg:hidden sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-primary">
           {currentNav.title}<span className="text-white">{currentNav.subtitle}</span>
         </h1>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="text-secondary hover:text-white"
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 text-slate-300 hover:bg-slate-800 rounded-lg active:scale-95 transition-transform"
         >
-          {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </Button>
+          <Menu size={24} />
+        </button>
       </header>
 
-      {/* Overlay para cerrar el sidebar al tocar fuera en móvil */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar con lógica responsiva */}
+      {/* SIDEBAR RESPONSIVO */}
       <Sidebar 
         items={currentNav.items} 
         title={currentNav.title} 
-        subtitle={currentNav.subtitle} 
+        subtitle={currentNav.subtitle}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* Contenido Principal */}
-      <main className="flex-1 p-4 lg:p-8 w-full transition-all duration-300">
-        <div className="max-w-7xl mx-auto">
+      {/* CONTENIDO PRINCIPAL */}
+      {/* En móvil: ml-0 (sin margen). En Desktop: lg:ml-64 (espacio para sidebar) */}
+      <main className="flex-1 w-full transition-all duration-300 lg:ml-64 p-4 md:p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
           {children}
         </div>
       </main>
