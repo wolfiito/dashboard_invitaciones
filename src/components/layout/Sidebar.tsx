@@ -1,29 +1,35 @@
-import { LayoutDashboard, CalendarDays, Users, Settings, LogOut } from 'lucide-react';
-import { NavLink } from 'react-router-dom'; // <--- Importante
-import { cn } from '@/lib/utils'; // <--- Usamos nuestra utilidad
+// src/components/layout/Sidebar.tsx
+import { LogOut, LucideIcon } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
-export function Sidebar() {
-  // Agregamos la propiedad 'path' a cada item
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: CalendarDays, label: 'Eventos', path: '/events' },
-    { icon: Users, label: 'Invitados', path: '/guests' },
-    { icon: Settings, label: 'Configuración', path: '/settings' },
-  ];
+interface NavItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+}
 
+interface SidebarProps {
+  items: NavItem[];
+  title: string;
+  subtitle: string;
+}
+
+export function Sidebar({ items, title, subtitle }: SidebarProps) {
   return (
     <aside className="w-64 bg-surface border-r border-slate-700 flex flex-col h-screen fixed left-0 top-0">
       <div className="p-6 border-b border-slate-700">
         <h1 className="text-2xl font-bold text-primary tracking-tight">
-          Event<span className="text-white">OS</span>
+          {title}<span className="text-white">{subtitle}</span>
         </h1>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
-        {menuItems.map((item) => (
+        {items.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
+            // Mantenemos la lógica de clase activa que ya tenías
             className={({ isActive }) => cn(
               "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
               isActive 
