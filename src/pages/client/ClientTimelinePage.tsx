@@ -1,5 +1,5 @@
 // src/pages/client/ClientTimelinePage.tsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Plus, Trash2, Clock, ChevronDown,
@@ -67,7 +67,7 @@ export function ClientTimelinePage() {
       toast.success("Actividad agregada");
       setNewItem({ time: "", title: "", description: "", icon: "Church" });
     } catch (error) {
-      toast.error("Error al guardar itinerario");
+      toast.error("Error al guardar itinerario" + error);
     } finally {
       setIsSaving(false);
     }
@@ -82,7 +82,7 @@ export function ClientTimelinePage() {
         updateCurrentEvent({ timeline: updatedTimeline });
         toast.success("Actividad eliminada");
     } catch (e) {
-        toast.error("No se pudo eliminar");
+        toast.error("No se pudo eliminar" + e);
     }
   };
 

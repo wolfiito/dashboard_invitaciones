@@ -12,7 +12,8 @@ import {
   getDoc
 } from "firebase/firestore";
 
-// --- NUEVA ESTRUCTURA ---
+export type GuestType = 'family' | 'individual';
+
 export interface GuestMember {
   name: string;
   isConfirmed: boolean;
@@ -22,14 +23,14 @@ export interface GuestMember {
 export interface GuestData {
   id?: string;
   eventId: string;
+  type: GuestType;
   familyName: string;
   contactEmail?: string;
   contactPhone?: string;
   members: GuestMember[];
   status: 'pending' | 'confirmed' | 'declined';
-  // --- CAMPOS NUEVOS PARA HOSTESS ---
   hasArrived?: boolean; 
-  arrivedAt?: object; // <--- CORREGIDO: Cambiamos 'any' por 'object'
+  arrivedAt?: object; 
 }
 
 export const guestService = {
@@ -39,7 +40,7 @@ export const guestService = {
       ...guest,
       createdAt: serverTimestamp()
     });
-    return docRef.id; // <--- ¡Esto es lo que nos faltaba!
+    return docRef.id;
   },
 
   // 2. ESCUCHAR
