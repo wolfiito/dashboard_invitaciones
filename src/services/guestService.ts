@@ -31,6 +31,7 @@ export interface GuestData {
   status: 'pending' | 'confirmed' | 'declined';
   hasArrived?: boolean; 
   arrivedAt?: object; 
+  message?: string;
 }
 
 export const guestService = {

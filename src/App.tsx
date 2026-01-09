@@ -13,6 +13,7 @@ import { HostessPage } from '@/pages/client/HostessPage';
 import { ClientTimelinePage } from "@/pages/client/ClientTimelinePage";
 import { ClientLocationPage } from '@/pages/client/ClientLocationPage';
 import { ClientGiftsPage } from "@/pages/client/ClientGiftsPage";
+import { ClientMessagesPage } from '@/pages/client/ClientMessagesPage';
 
 function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode, allowedRole: 'admin' | 'client' }) {
   const { isAuthenticated, role } = useAuthStore();
@@ -41,6 +42,8 @@ function App() {
                 <Route path="timeline" element={<ClientTimelinePage />} />
                 <Route path="location" element={<ClientLocationPage />} />
                 <Route path="gift" element={<ClientGiftsPage />} />
+                <Route path="dashboard" element={<ClientDashboardPage />} />
+                <Route path="messages" element={<ClientMessagesPage />} />
                 {/* IMPORTANTE: Ruta absoluta para evitar recursión */}
                 <Route path="*" element={<Navigate to="/client/dashboard" replace />} />
               </Routes>

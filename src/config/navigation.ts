@@ -8,7 +8,8 @@ import {
   MapPin, 
   Gift, 
   QrCode, 
-  TableProperties 
+  TableProperties,
+  Heart
 } from 'lucide-react';
 
 export const ADMIN_NAV = [
@@ -26,4 +27,5 @@ export const CLIENT_NAV = [
   { icon: MapPin, label: 'Ubicación', path: '/client/location' },
   { icon: Gift, label: 'Regalos', path: '/client/gift' },
   { icon: QrCode, label: 'Modo Hostess', path: '/client/hostess' },
+  { icon: Heart, label: 'Libro de Visitas', path: '/client/messages' },
 ];
