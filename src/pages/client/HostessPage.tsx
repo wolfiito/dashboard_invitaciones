@@ -1,18 +1,37 @@
-import { useState } from "react";
+// src/pages/client/HostessPage.tsx
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { ArrowLeft, CheckCircle2, XCircle, Users, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { guestService, GuestData } from "@/services/guestService";
+import { tableService, TableData } from "@/services/tableService"; // Importamos servicio de mesas
+import { useAuthStore } from "@/store/useAuthStore"; // Para obtener el ID del evento actual
 
 export function HostessPage() {
   const navigate = useNavigate();
+  const { clientEvent } = useAuthStore();
+  
+  // Estados
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [guest, setGuest] = useState<GuestData | null>(null);
+  const [tables, setTables] = useState<TableData[]>([]); // Lista de mesas para buscar nombres
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [justCheckedIn, setJustCheckedIn] = useState(false);
+
+  // 1. CARGAR MESAS AL INICIAR
+  // Esto asegura que tengamos los nombres listos para mostrar al escanear
+  useEffect(() => {
+    if (!clientEvent?.id) return;
+
+    const unsubscribe = tableService.subscribeByEvent(clientEvent.id, (data) => {
+      setTables(data);
+    });
+
+    return () => unsubscribe();
+  }, [clientEvent?.id]);
 
   // Sonido de éxito (opcional)
   const playSuccessSound = () => {
@@ -33,12 +52,15 @@ export function HostessPage() {
       
       if (!data) {
         setError("Código no válido o invitación eliminada.");
+      } else if (data.eventId !== clientEvent?.id) {
+        // Seguridad: Verificar que el invitado sea de ESTE evento
+        setError("Este código QR pertenece a otro evento.");
       } else {
         setGuest(data);
         playSuccessSound();
       }
     } catch (err) {
-      console.log(err)
+      console.error(err);
       setError("Error de conexión al buscar.");
     } finally {
       setLoading(false);
@@ -57,7 +79,7 @@ export function HostessPage() {
       setJustCheckedIn(true);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]); // Doble vibración
     } catch (err) {
-      console.log(err)
+      console.error(err);
       alert("Error al registrar entrada");
     } finally {
       setLoading(false);
@@ -69,6 +91,13 @@ export function HostessPage() {
     setGuest(null);
     setError(null);
     setJustCheckedIn(false);
+  };
+
+  // Helper para obtener nombre de mesa
+  const getTableName = (tableId?: string | null) => {
+    if (!tableId) return null;
+    const table = tables.find(t => t.id === tableId);
+    return table ? table.name : "Mesa Eliminada";
   };
 
   return (
@@ -135,34 +164,41 @@ export function HostessPage() {
 
                    <CardContent className="pt-6 space-y-6">
                       
-                      {/* LISTA DE MESAS */}
+                      {/* LISTA DE MESAS (ACTUALIZADO) */}
                       <div className="space-y-3">
                          <p className="text-xs font-bold text-slate-500 uppercase">Distribución de Mesas</p>
                          <div className="grid gap-2 max-h-60 overflow-y-auto">
-                            {guest.members.map((m, i) => (
-                                <div key={i} className="flex justify-between items-center p-3 bg-slate-950 rounded border border-slate-800">
-                                    <span className="font-medium">{m.name}</span>
-                                    {m.tableId ? (
-                                        <span className="text-green-400 font-bold text-sm">Mesa Asignada</span>
-                                    ) : (
-                                        <span className="text-red-400 text-xs italic">Sin Mesa</span>
-                                    )}
-                                </div>
-                            ))}
+                            {guest.members.map((m, i) => {
+                                const tableName = getTableName(m.tableId);
+                                return (
+                                  <div key={i} className="flex justify-between items-center p-3 bg-slate-950 rounded border border-slate-800">
+                                      <span className="font-medium">{m.name}</span>
+                                      {tableName ? (
+                                          <span className="text-green-400 font-bold text-sm bg-green-900/20 px-2 py-1 rounded border border-green-900/50">
+                                            {tableName}
+                                          </span>
+                                      ) : (
+                                          <span className="text-red-400 text-xs italic opacity-70">
+                                            Sin Mesa
+                                          </span>
+                                      )}
+                                  </div>
+                                );
+                            })}
                          </div>
                       </div>
 
                       {/* BOTONES DE ACCIÓN */}
                       {!justCheckedIn ? (
                           <Button 
-                            className="w-full h-16 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+                            className="w-full h-16 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all hover:scale-[1.02]"
                             onClick={handleCheckIn}
-                            disabled={guest.hasArrived} // Ya no da error porque hasArrived está en la interfaz
+                            disabled={guest.hasArrived} 
                           >
                              {guest.hasArrived ? "YA INGRESÓ ANTES" : "DAR ACCESO"}
                           </Button>
                       ) : (
-                          <div className="text-center py-2 animate-in zoom-in">
+                          <div className="text-center py-2 animate-in zoom-in duration-300">
                              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-2" />
                              <p className="text-xl font-bold text-green-500">¡Bienvenidos!</p>
                           </div>
