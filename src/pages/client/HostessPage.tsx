@@ -2,7 +2,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scanner } from "@yudiel/react-qr-scanner";
-import { ArrowLeft, CheckCircle2, XCircle, Users, RefreshCw } from "lucide-react";
+import { 
+  ArrowLeft, 
+  CheckCircle2, 
+  XCircle, 
+  Users, 
+  RefreshCw,
+  UserX,        // Nuevo
+  AlertCircle,  // Nuevo
+  Armchair      // Nuevo (Sillón para representar mesa)
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { guestService, GuestData } from "@/services/guestService";
@@ -20,7 +29,6 @@ export function HostessPage() {
   const [loading, setLoading] = useState(false);
   const [justCheckedIn, setJustCheckedIn] = useState(false);
 
-  // 1. Cargar mesas para tener los nombres listos
   useEffect(() => {
     if (!clientEvent?.id) return;
     const unsubscribe = tableService.subscribeByEvent(clientEvent.id, (data) => {
@@ -149,47 +157,95 @@ export function HostessPage() {
 
                    <CardContent className="pt-6 space-y-6">
                       
-                      {/* --- AQUÍ ESTÁ EL CAMBIO SOLICITADO --- */}
+                      {/* --- LISTA MEJORADA --- */}
                       <div className="space-y-3">
-                         <p className="text-xs font-bold text-slate-500 uppercase">Distribución de Mesas</p>
-                         <div className="grid gap-2 max-h-60 overflow-y-auto">
+                         <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-slate-500 uppercase">Distribución de Mesas</p>
+                            <span className="text-[10px] text-slate-600 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                {guest.members.filter(m => m.isConfirmed).length} Confirmados
+                            </span>
+                         </div>
+
+                         <div className="grid gap-2 max-h-64 overflow-y-auto pr-1">
                             {guest.members.map((m, i) => {
                                 const tableName = getTableName(m.tableId);
                                 
-                                return (
-                                  <div key={i} className="flex justify-between items-center p-3 bg-slate-950 rounded border border-slate-800">
-                                      {/* Nombre del invitado (Tachado si canceló) */}
-                                      <span className={`font-medium ${!m.isConfirmed ? "text-slate-500 line-through decoration-slate-600" : "text-slate-200"}`}>
-                                        {m.name}
-                                      </span>
+                                // Configuración dinámica de estilos según estado
+                                let statusStyle = {
+                                    bg: "bg-slate-900/50",
+                                    border: "border-slate-800",
+                                    iconColor: "text-slate-500",
+                                    textColor: "text-slate-300",
+                                    Icon: Armchair,
+                                    badge: "Sin Mesa",
+                                    badgeColor: "text-slate-500 bg-slate-800"
+                                };
 
-                                      {/* Lógica de Etiquetas (Badges) */}
-                                      {!m.isConfirmed ? (
-                                          // CASO 1: CANCELÓ
-                                          <span className="text-red-500 font-bold text-xs bg-red-950/30 px-2 py-1 rounded border border-red-900/50 uppercase tracking-wider">
-                                            Canceló
-                                          </span>
-                                      ) : tableName ? (
-                                          // CASO 2: TIENE MESA
-                                          <span className="text-green-400 font-bold text-sm bg-green-900/20 px-2 py-1 rounded border border-green-900/50">
-                                            {tableName}
-                                          </span>
-                                      ) : (
-                                          // CASO 3: SIN MESA
-                                          <span className="text-yellow-500/70 text-xs italic bg-yellow-900/10 px-2 py-1 rounded">
-                                            Sin Mesa
-                                          </span>
-                                      )}
+                                if (!m.isConfirmed) {
+                                    statusStyle = {
+                                        bg: "bg-red-950/10",
+                                        border: "border-red-900/20",
+                                        iconColor: "text-red-500/50",
+                                        textColor: "text-slate-500 line-through decoration-red-900/50",
+                                        Icon: UserX,
+                                        badge: "Canceló",
+                                        badgeColor: "text-red-400 bg-red-950/30 border-red-900/50"
+                                    };
+                                } else if (tableName) {
+                                    statusStyle = {
+                                        bg: "bg-green-950/20",
+                                        border: "border-green-900/30",
+                                        iconColor: "text-green-400",
+                                        textColor: "text-white font-medium",
+                                        Icon: Armchair,
+                                        badge: tableName,
+                                        badgeColor: "text-green-400 bg-green-900/20 border-green-900/50 font-bold shadow-[0_0_10px_rgba(74,222,128,0.1)]"
+                                    };
+                                } else {
+                                    statusStyle = {
+                                        bg: "bg-yellow-950/10",
+                                        border: "border-yellow-900/30",
+                                        iconColor: "text-yellow-500",
+                                        textColor: "text-slate-200",
+                                        Icon: AlertCircle,
+                                        badge: "Sin Mesa",
+                                        badgeColor: "text-yellow-500 bg-yellow-900/20 border-yellow-900/50"
+                                    };
+                                }
+
+                                const StatusIcon = statusStyle.Icon;
+
+                                return (
+                                  <div 
+                                    key={i} 
+                                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${statusStyle.bg} ${statusStyle.border}`}
+                                  >
+                                      {/* Icono a la izquierda */}
+                                      <div className={`p-2 rounded-full bg-black/20 ${statusStyle.iconColor}`}>
+                                          <StatusIcon className="w-4 h-4" />
+                                      </div>
+
+                                      {/* Nombre */}
+                                      <div className="flex-1 min-w-0">
+                                          <p className={`text-sm truncate ${statusStyle.textColor}`}>
+                                            {m.name}
+                                          </p>
+                                      </div>
+
+                                      {/* Badge de estado a la derecha */}
+                                      <div className={`px-2.5 py-1 rounded text-xs border ${statusStyle.badgeColor} whitespace-nowrap`}>
+                                          {statusStyle.badge}
+                                      </div>
                                   </div>
                                 );
                             })}
                          </div>
                       </div>
-                      {/* -------------------------------------- */}
+                      {/* ---------------------- */}
 
                       {!justCheckedIn ? (
                           <Button 
-                            className="w-full h-16 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all hover:scale-[1.02]"
+                            className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-black shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
                             onClick={handleCheckIn}
                             disabled={guest.hasArrived} 
                           >
@@ -202,7 +258,7 @@ export function HostessPage() {
                           </div>
                       )}
 
-                      <Button variant="outline" onClick={resetScanner} className="w-full border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">
+                      <Button variant="ghost" onClick={resetScanner} className="w-full text-slate-500 hover:text-white hover:bg-slate-900">
                          <RefreshCw className="w-4 h-4 mr-2" />
                          Escanear Siguiente
                       </Button>
