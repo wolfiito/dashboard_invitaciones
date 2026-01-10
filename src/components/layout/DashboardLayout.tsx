@@ -28,7 +28,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const currentNav = navConfig[role];
 
   return (
-    <div className="min-h-screen bg-black text-slate-200 font-sans flex flex-col lg:flex-row">
+    <div className="min-h-screen text-black font-sans flex flex-col lg:flex-row">
       
       {/* HEADER MÓVIL (Solo visible en pantallas pequeñas) */}
       <header className="lg:hidden sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between">

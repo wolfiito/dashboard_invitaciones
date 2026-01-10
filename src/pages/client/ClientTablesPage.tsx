@@ -9,7 +9,8 @@ import {
   XCircle,
   UserX,
   CheckCircle2,
-  Clock
+  Clock,
+  FileDown 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export function ClientTablesPage() {
   const navigate = useNavigate();
@@ -42,44 +45,158 @@ export function ClientTablesPage() {
     return () => { unsubTables(); unsubGuests(); };
   }, [clientEvent?.id]);
 
-  // --- LÓGICA DE CONTEO DETALLADO ---
-  const getTableStats = (tableId: string) => {
-  let confirmed = 0;
-  let pending = 0;
-  let declined = 0;
+  // --- PDF GENERATOR (GRID 4xN + STATUS) ---
+  const handleDownloadPDF = () => {
+    if (!clientEvent) return;
 
-  guests.forEach(group => {
-    group.members?.forEach(member => {
-      if (member.tableId === tableId) {
-        if (group.status === 'pending') {
-          pending++;
-        } else if (group.status === 'declined') {
-          declined++;
-        } else { 
-          // Corrección aquí: Usamos if/else en lugar de un ternario para efectos secundarios
-          if (member.isConfirmed) {
-            confirmed++;
-          } else {
-            declined++;
-          }
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const eventName = clientEvent.name || "Evento";
+    const eventDate = clientEvent.date 
+      ? new Date(clientEvent.date).toLocaleDateString("es-MX", { dateStyle: "long" }) 
+      : "";
+
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 10;
+    const gap = 5; 
+    const columns = 4; 
+    const tableWidth = (pageWidth - (margin * 2) - (gap * (columns - 1))) / columns;
+
+    doc.setFontSize(18);
+    doc.setTextColor(40, 40, 40);
+    doc.text(eventName, margin, 15);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Distribución de Mesas - ${eventDate}`, margin, 22);
+    doc.line(margin, 25, pageWidth - margin, 25);
+
+    let startY = 30;
+    let maxRowHeight = 0;
+    
+    const sortedTables = [...tables].sort((a, b) => 
+      a.name.localeCompare(b.name, undefined, { numeric: true })
+    );
+
+    sortedTables.forEach((table, index) => {
+      if (index > 0 && index % columns === 0) {
+        startY = maxRowHeight + 10; 
+      }
+
+      if (startY > pageHeight - 30) {
+        doc.addPage();
+        startY = 20; 
+        maxRowHeight = 20;
+      }
+
+      const colIndex = index % columns;
+      const currentX = margin + (colIndex * (tableWidth + gap));
+
+      // Obtenemos miembros y determinamos su status para el PDF
+      const assignedMembers = guests.flatMap(g => g.members)
+        .filter(m => m.tableId === table.id)
+        .map(m => {
+            // Buscamos el grupo padre para saber el status real
+            const parent = guests.find(g => g.members.some(mem => mem.name === m.name)); // Simplificado
+            const isConfirmed = m.isConfirmed; 
+            return { name: m.name, status: isConfirmed ? "OK" : "P" };
+        });
+
+      const tableRows = assignedMembers.length > 0 
+        ? assignedMembers.map(m => [
+            m.name.length > 18 ? m.name.substring(0, 16) + ".." : m.name,
+            m.status // Columna Status
+          ])
+        : [["(Vacía)", "-"]];
+
+      autoTable(doc, {
+        startY: startY,
+        margin: { left: currentX },
+        tableWidth: tableWidth,
+        head: [[table.name.toUpperCase(), "EST"]], // Header con Status
+        body: tableRows,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [236, 72, 153],
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center',
+          cellPadding: 2
+        },
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.5,
+          overflow: 'ellipsize',
+          valign: 'middle'
+        },
+        columnStyles: {
+            0: { cellWidth: 'auto' },
+            1: { cellWidth: 10, halign: 'center' } // Columna EST pequeña
+        },
+        didDrawPage: (data) => {
+           if (data.cursor && data.cursor.y > maxRowHeight) {
+               maxRowHeight = data.cursor.y;
+           }
         }
+      });
+      
+      // @ts-ignore
+      if (doc.lastAutoTable.finalY > maxRowHeight) {
+        // @ts-ignore
+        maxRowHeight = doc.lastAutoTable.finalY;
       }
     });
-  });
-  return { confirmed, pending, declined };
-};
+
+    const totalAssigned = guests.flatMap(g => g.members).filter(m => m.tableId).length;
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Total Invitados Asignados: ${totalAssigned}`, margin, pageHeight - 5);
+    doc.text(`Leyenda: OK = Confirmado, P = Pendiente`, pageWidth - 60, pageHeight - 5);
+
+    doc.save(`Mesas_Grid_${eventName.replace(/\s+/g, '_')}.pdf`);
+    toast.success("PDF descargado correctamente");
+  };
+
+  // --- ESTADÍSTICAS ---
+  const getTableStats = (tableId: string) => {
+    let confirmed = 0;
+    let pending = 0;
+    let declined = 0;
+
+    guests.forEach(group => {
+      group.members?.forEach(member => {
+        if (member.tableId === tableId) {
+          if (group.status === 'pending') {
+            pending++;
+          } else if (group.status === 'declined') {
+            declined++;
+          } else { 
+            if (member.isConfirmed) confirmed++;
+            else declined++;
+          }
+        }
+      });
+    });
+    return { confirmed, pending, declined };
+  };
 
   const getTotalUnassigned = () => {
     let count = 0;
     guests.forEach(group => {
+      // Contamos pendientes O confirmados que no tengan mesa
+      // Excluyendo los que ya declinaron explícitamente (group confirmed but member false)
+      if (group.status === 'declined') return;
+
       group.members?.forEach(member => {
-        if (member.isConfirmed && !member.tableId) count++;
+         const isValid = group.status === 'pending' || (group.status === 'confirmed' && member.isConfirmed);
+         if (isValid && !member.tableId) count++;
       });
     });
     return count;
   };
 
-  // --- ACCIONES ---
+  // --- ACTIONS ---
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientEvent?.id) return;
@@ -117,7 +234,7 @@ export function ClientTablesPage() {
     }
   };
 
-  // --- DATOS PARA EL MODAL ---
+  // --- DATA PROCESSING FOR MODAL ---
   const membersInTable = selectedTable 
     ? guests.flatMap(group => 
         group.members
@@ -132,10 +249,19 @@ export function ClientTablesPage() {
       )
     : [];
   
+  // CORRECCIÓN SOLICITADA: MOSTRAR TAMBIÉN PENDIENTES
   const membersUnassigned = guests.flatMap(group => 
     group.members
-      .filter(m => m.isConfirmed && !m.tableId)
-      .map(m => ({ ...m, guestId: group.id, familyName: group.familyName }))
+      .filter(m => !m.tableId) // Primero, que no tenga mesa
+      .filter(m => {
+          // Si el grupo declinó, nadie aparece
+          if (group.status === 'declined') return false;
+          // Si el grupo confirmó, solo mostramos a los confirmados (los false son "no voy")
+          if (group.status === 'confirmed' && !m.isConfirmed) return false;
+          // Si es 'pending', pasan todos
+          return true;
+      })
+      .map(m => ({ ...m, guestId: group.id, familyName: group.familyName, status: group.status }))
   );
   
   const stats = selectedTable ? getTableStats(selectedTable.id!) : { confirmed: 0, pending: 0, declined: 0 };
@@ -150,19 +276,35 @@ export function ClientTablesPage() {
           </Button>
           <h1 className="text-3xl font-black text-white">Mesas</h1>
         </div>
-        <p className="text-xs font-bold text-primary uppercase tracking-widest bg-primary/10 w-fit px-3 py-1 rounded-full border border-primary/20">
-          {getTotalUnassigned()} confirmados sin lugar
-        </p>
-        <Button onClick={() => setIsCreateModalOpen(true)} className="w-full lg:w-fit bg-purple-600 hover:bg-purple-500 rounded-xl">
-          <Plus className="w-4 h-4 mr-2" /> Nueva Mesa
-        </Button>
+        
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <p className="text-xs font-bold text-primary uppercase tracking-widest bg-primary/10 w-fit px-3 py-1 rounded-full border border-primary/20">
+            {getTotalUnassigned()} sin lugar asignado
+            </p>
+
+            <div className="flex gap-2 w-full sm:w-auto">
+                <Button 
+                    onClick={handleDownloadPDF} 
+                    variant="outline" 
+                    className="flex-1 sm:flex-none border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                >
+                    <FileDown className="w-4 h-4 mr-2 text-pink-500" />
+                    PDF
+                </Button>
+
+                <Button onClick={() => setIsCreateModalOpen(true)} className="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-500 rounded-xl">
+                    <Plus className="w-4 h-4 mr-2" /> Nueva Mesa
+                </Button>
+            </div>
+        </div>
       </div>
 
-      {/* Grid de Mesas */}
+      {/* Grid Mesas */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {tables.map(table => {
           const { confirmed, pending, declined } = getTableStats(table.id!);
-          const isFull = confirmed >= table.capacity;
+          const totalAssigned = confirmed + pending; // Ocupación real (incluyendo pendientes)
+          const isFull = totalAssigned >= table.capacity;
 
           return (
             <motion.div layout key={table.id}>
@@ -178,7 +320,7 @@ export function ClientTablesPage() {
                 <CardContent className="text-center space-y-3 pb-6">
                   <div className="flex flex-col items-center">
                     <div className="flex items-baseline gap-1">
-                      <span className={cn("text-3xl font-black", confirmed > table.capacity ? "text-red-500" : "text-white")}>{confirmed}</span>
+                      <span className={cn("text-3xl font-black", totalAssigned > table.capacity ? "text-red-500" : "text-white")}>{totalAssigned}</span>
                       <span className="text-xs font-bold text-slate-500">/ {table.capacity}</span>
                     </div>
                     <div className="flex gap-1 mt-1">
@@ -187,7 +329,7 @@ export function ClientTablesPage() {
                     </div>
                   </div>
                   <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                    <div className={cn("h-full transition-all duration-500", confirmed > table.capacity ? "bg-red-500" : isFull ? "bg-purple-400" : "bg-primary")} style={{ width: `${Math.min((confirmed / table.capacity) * 100, 100)}%` }} />
+                    <div className={cn("h-full transition-all duration-500", totalAssigned > table.capacity ? "bg-red-500" : isFull ? "bg-purple-400" : "bg-primary")} style={{ width: `${Math.min((totalAssigned / table.capacity) * 100, 100)}%` }} />
                   </div>
                 </CardContent>
               </Card>
@@ -196,7 +338,7 @@ export function ClientTablesPage() {
         })}
       </div>
 
-      {/* MODAL GESTIÓN */}
+      {/* MODAL */}
       <AnimatePresence>
         {selectedTable && (
           <Modal isOpen={!!selectedTable} onClose={() => setSelectedTable(null)} title={selectedTable.name}>
@@ -235,19 +377,27 @@ export function ClientTablesPage() {
                     ))}
                   </div>
                 </div>
-                {/* SIN MESA */}
+                
+                {/* SIN MESA (AHORA INCLUYE PENDIENTES) */}
                 <div className="flex flex-col border border-slate-800 rounded-2xl bg-slate-950 overflow-hidden">
-                  <div className="p-3 bg-slate-900 border-b border-slate-800 font-bold text-[10px] text-slate-500 uppercase tracking-widest">Confirmados sin mesa</div>
+                  <div className="p-3 bg-slate-900 border-b border-slate-800 font-bold text-[10px] text-slate-500 uppercase tracking-widest">Sin asignar (Conf. o Pend.)</div>
                   <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {membersUnassigned.map((m, i) => (
                       <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-white truncate">{m.name}</p>
+                          <div className="flex items-center gap-2">
+                             <p className="text-sm font-bold text-white truncate">{m.name}</p>
+                             {/* Badge para diferenciar pendientes */}
+                             {m.status === 'pending' && <span className="text-[8px] bg-yellow-500/20 text-yellow-500 px-1 rounded">PEND</span>}
+                          </div>
                           <p className="text-[10px] text-slate-500 uppercase">{m.familyName}</p>
                         </div>
                         <Button size="sm" variant="ghost" onClick={() => handleAssignMember(m.guestId!, m.name, selectedTable.id!)} className="text-primary hover:bg-primary/10 p-0 h-8 w-8"><ArrowRight size={18} /></Button>
                       </div>
                     ))}
+                    {membersUnassigned.length === 0 && (
+                        <p className="text-center text-xs text-slate-500 mt-4">No hay invitados disponibles para asignar.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -257,7 +407,6 @@ export function ClientTablesPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL CREAR MESA */}
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Nueva Mesa">
         <form onSubmit={handleCreateTable} className="space-y-6">
           <div className="space-y-2"><Label>Nombre</Label><Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-slate-950 border-slate-800" /></div>
