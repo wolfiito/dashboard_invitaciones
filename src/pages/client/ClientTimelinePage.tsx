@@ -18,10 +18,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { eventService, TimelineItem } from "@/services/eventService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { cn } from "@/lib/utils";
+import { IconBrindis } from "@/components/icons/CustomIcons";
 
 const AVAILABLE_ICONS = [
   { name: "Church", Icon: Church, label: "Ceremonia" },
-  { name: "GlassWater", Icon: GlassWater, label: "Cóctel" },
+  { name: "IconBrindis", Icon: IconBrindis, label: "Cóctel" },
   { name: "Utensils", Icon: Utensils, label: "Banquete" },
   { name: "Music", Icon: Music, label: "Fiesta" },
   { name: "Camera", Icon: Camera, label: "Fotos" },
