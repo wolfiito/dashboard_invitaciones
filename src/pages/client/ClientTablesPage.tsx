@@ -97,7 +97,7 @@ export function ClientTablesPage() {
         .filter(m => m.tableId === table.id)
         .map(m => {
             // Buscamos el grupo padre para saber el status real
-            const parent = guests.find(g => g.members.some(mem => mem.name === m.name)); // Simplificado
+            // const parent = guests.find(g => g.members.some(mem => mem.name === m.name)); // Simplificado
             const isConfirmed = m.isConfirmed; 
             return { name: m.name, status: isConfirmed ? "OK" : "P" };
         });

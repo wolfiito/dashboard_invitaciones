@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Plus, Trash2, Clock, ChevronDown,
-  Church, Music, Utensils, GlassWater, Cake, Camera, 
+  Church, Music, Utensils, Cake, Camera, 
   Heart, Bus, Coffee, Star, Sparkles, Info, Loader2,
   CalendarDays
 } from "lucide-react";
