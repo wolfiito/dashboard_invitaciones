@@ -2,9 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  ArrowLeft, Plus, Trash2, Clock, ChevronDown,
-  Church, Music, Utensils, Cake, Camera, 
-  Heart, Bus, Coffee, Star, Sparkles, Info, Loader2,
+  ArrowLeft, Plus, Trash2, Clock, ChevronDown, Star, Info, Loader2,
   CalendarDays
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,20 +16,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { eventService, TimelineItem } from "@/services/eventService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { cn } from "@/lib/utils";
-import { IconBrindis } from "@/components/icons/CustomIcons";
+import { IconBrindis, PngIcon, IconAnillos, IconComida, IconFotos} from "@/components/icons/CustomIcons";
+import imgRecepcion from "@/assets/reception.png"; 
+
+const IconRecepcion = ({ size, className }: { size?: number | string, className?: string }) => (
+  <PngIcon 
+    src={imgRecepcion} 
+    size={size} 
+    className={className} 
+  />
+);
 
 const AVAILABLE_ICONS = [
-  { name: "Church", Icon: Church, label: "Ceremonia" },
-  { name: "IconBrindis", Icon: IconBrindis, label: "Cóctel" },
-  { name: "Utensils", Icon: Utensils, label: "Banquete" },
-  { name: "Music", Icon: Music, label: "Fiesta" },
-  { name: "Camera", Icon: Camera, label: "Fotos" },
-  { name: "Cake", Icon: Cake, label: "Pastel" },
-  { name: "Bus", Icon: Bus, label: "Transporte" },
-  { name: "Heart", Icon: Heart, label: "Votos" },
-  { name: "Coffee", Icon: Coffee, label: "Torna Boda" },
-  { name: "Sparkles", Icon: Sparkles, label: "Salida" },
-  { name: "Star", Icon: Star, label: "Otro" },
+  
+  { name: "Recepcion", Icon: IconRecepcion, label: "Recepción" },
+  { name: "Ceremonia", Icon: IconAnillos, label: "Ceremonia" },
+  { name: "Comida", Icon: IconComida, label: "Comida" },
+  { name: "Fotos", Icon: IconFotos, label: "Fotos" },
+  { name: "Brindis", Icon: IconBrindis, label: "Brindis" },
+
 ];
 
 export function ClientTimelinePage() {
