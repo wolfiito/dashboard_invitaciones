@@ -34,7 +34,7 @@ const AVAILABLE_ICONS = [
   { name: "Comida", Icon: IconComida, label: "Comida" },
   { name: "Fotos", Icon: IconFotos, label: "Fotos" },
   { name: "Brindis", Icon: IconBrindis, label: "Brindis" },
-
+  { name: "Salida", Icon: IconBrindis, label: "Salida"}
 ];
 
 export function ClientTimelinePage() {
