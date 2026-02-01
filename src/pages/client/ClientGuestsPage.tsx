@@ -160,7 +160,7 @@ export function ClientGuestsPage() {
     if (!clientEvent?.invitationUrl) { toast.error("Falta URL del evento"); return; }
     const cleanBaseUrl = clientEvent.invitationUrl.endsWith('/') ? clientEvent.invitationUrl.slice(0, -1) : clientEvent.invitationUrl;
     const uniqueLink = `${cleanBaseUrl}/?ticket=${guest.id}`;
-    const message = `Hola ${guest.type === 'family' ? 'Familia ' : ''}${guest.familyName} 👋Hola,\n\nPor la gracia de Dios estamos cada vez más cerca de celebrar nuestra unión y queremos invitarte a agradecer y compartir con nosotros.\n\nConfirma tu asistencia aquí: ${uniqueLink} \n\n*_ANTES DEL 01 DE ABRIL_*`;
+    const message = `Hola *${guest.type === 'family' ? 'Familia ' : ''}${guest.familyName}✨* \n\nPor la gracia de Dios estamos cada vez más cerca de celebrar nuestra unión 💍 y queremos invitarte a agradecer y compartir con nosotros.\n\nConfirma tu asistencia aquí 👇: \n\n ${uniqueLink} \n\n⚠️🗓️ *_ANTES DEL 01 DE ABRIL_* 🗓️⚠️`;
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
