@@ -1,4 +1,3 @@
-// src/pages/client/ClientTablesPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -45,7 +44,7 @@ export function ClientTablesPage() {
     return () => { unsubTables(); unsubGuests(); };
   }, [clientEvent?.id]);
 
-  // --- PDF GENERATOR (GRID 4xN + STATUS) ---
+  // --- PDF GENERATOR ---
   const handleDownloadPDF = () => {
     if (!clientEvent) return;
 
@@ -74,6 +73,7 @@ export function ClientTablesPage() {
     let startY = 30;
     let maxRowHeight = 0;
     
+    // Ordenar mesas numéricamente si es posible
     const sortedTables = [...tables].sort((a, b) => 
       a.name.localeCompare(b.name, undefined, { numeric: true })
     );
@@ -92,20 +92,17 @@ export function ClientTablesPage() {
       const colIndex = index % columns;
       const currentX = margin + (colIndex * (tableWidth + gap));
 
-      // Obtenemos miembros y determinamos su status para el PDF
       const assignedMembers = guests.flatMap(g => g.members)
         .filter(m => m.tableId === table.id)
-        .map(m => {
-            // Buscamos el grupo padre para saber el status real
-            // const parent = guests.find(g => g.members.some(mem => mem.name === m.name)); // Simplificado
-            const isConfirmed = m.isConfirmed; 
-            return { name: m.name, status: isConfirmed ? "OK" : "P" };
-        });
+        .map(m => ({ 
+            name: m.name, 
+            status: m.isConfirmed ? "OK" : "P" 
+        }));
 
       const tableRows = assignedMembers.length > 0 
         ? assignedMembers.map(m => [
             m.name.length > 18 ? m.name.substring(0, 16) + ".." : m.name,
-            m.status // Columna Status
+            m.status
           ])
         : [["(Vacía)", "-"]];
 
@@ -113,7 +110,7 @@ export function ClientTablesPage() {
         startY: startY,
         margin: { left: currentX },
         tableWidth: tableWidth,
-        head: [[table.name.toUpperCase(), "EST"]], // Header con Status
+        head: [[table.name.toUpperCase(), "EST"]],
         body: tableRows,
         theme: 'grid',
         headStyles: {
@@ -132,7 +129,7 @@ export function ClientTablesPage() {
         },
         columnStyles: {
             0: { cellWidth: 'auto' },
-            1: { cellWidth: 10, halign: 'center' } // Columna EST pequeña
+            1: { cellWidth: 10, halign: 'center' }
         },
         didDrawPage: (data) => {
            if (data.cursor && data.cursor.y > maxRowHeight) {
@@ -184,10 +181,7 @@ export function ClientTablesPage() {
   const getTotalUnassigned = () => {
     let count = 0;
     guests.forEach(group => {
-      // Contamos pendientes O confirmados que no tengan mesa
-      // Excluyendo los que ya declinaron explícitamente (group confirmed but member false)
       if (group.status === 'declined') return;
-
       group.members?.forEach(member => {
          const isValid = group.status === 'pending' || (group.status === 'confirmed' && member.isConfirmed);
          if (isValid && !member.tableId) count++;
@@ -212,7 +206,7 @@ export function ClientTablesPage() {
       const nextNum = parseInt(formData.name.replace(/\D/g, '')) + 1;
       setFormData({ name: isNaN(nextNum) ? "Mesa" : `Mesa ${nextNum}`, capacity: formData.capacity });
     } catch (error) {
-      toast.error("Error al crear mesa" + error);
+      toast.error("Error al crear mesa: " + error);
     } finally {
       setLoading(false);
     }
@@ -230,7 +224,7 @@ export function ClientTablesPage() {
     try {
       await guestService.assignMember(guestId, memberName, tableId);
     } catch (error) {
-      toast.error("Error al asignar" + error);
+      toast.error("Error al asignar: " + error);
     }
   };
 
@@ -249,16 +243,12 @@ export function ClientTablesPage() {
       )
     : [];
   
-  // CORRECCIÓN SOLICITADA: MOSTRAR TAMBIÉN PENDIENTES
   const membersUnassigned = guests.flatMap(group => 
     group.members
-      .filter(m => !m.tableId) // Primero, que no tenga mesa
+      .filter(m => !m.tableId)
       .filter(m => {
-          // Si el grupo declinó, nadie aparece
           if (group.status === 'declined') return false;
-          // Si el grupo confirmó, solo mostramos a los confirmados (los false son "no voy")
           if (group.status === 'confirmed' && !m.isConfirmed) return false;
-          // Si es 'pending', pasan todos
           return true;
       })
       .map(m => ({ ...m, guestId: group.id, familyName: group.familyName, status: group.status }))
@@ -271,10 +261,10 @@ export function ClientTablesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/client/dashboard")} className="text-slate-400 p-0">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/client/dashboard")} className="text-muted-foreground p-0 lg:hidden">
             <ArrowLeft size={20} />
           </Button>
-          <h1 className="text-3xl font-black text-white">Mesas</h1>
+          <h1 className="text-3xl font-black text-foreground">Mesas</h1>
         </div>
         
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -286,29 +276,32 @@ export function ClientTablesPage() {
                 <Button 
                     onClick={handleDownloadPDF} 
                     variant="outline" 
-                    className="flex-1 sm:flex-none border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="flex-1 sm:flex-none border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                     <FileDown className="w-4 h-4 mr-2 text-pink-500" />
                     PDF
                 </Button>
 
-                <Button onClick={() => setIsCreateModalOpen(true)} className="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-500 rounded-xl">
+                <Button onClick={() => setIsCreateModalOpen(true)} className="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-500 text-white rounded-xl shadow-lg shadow-purple-600/20">
                     <Plus className="w-4 h-4 mr-2" /> Nueva Mesa
                 </Button>
             </div>
         </div>
       </div>
 
-      {/* Grid Mesas */}
+      {/* Grid Mesas - ESTILO ORIGINAL PRESERVADO */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {tables.map(table => {
           const { confirmed, pending, declined } = getTableStats(table.id!);
-          const totalAssigned = confirmed + pending; // Ocupación real (incluyendo pendientes)
+          const totalAssigned = confirmed + pending; 
           const isFull = totalAssigned >= table.capacity;
 
           return (
             <motion.div layout key={table.id}>
-              <Card onClick={() => setSelectedTable(table)} className={cn("bg-slate-900/40 border-slate-800 relative cursor-pointer hover:border-purple-500 transition-all", isFull && "bg-purple-500/5")}>
+              <Card onClick={() => setSelectedTable(table)} className={cn(
+                "bg-slate-900/40 border-slate-800 relative cursor-pointer hover:border-purple-500 transition-all",
+                isFull && "bg-purple-500/5"
+              )}>
                 <div className="absolute top-2 right-2 z-10">
                   <Button variant="ghost" size="sm" onClick={(e) => handleDeleteTable(e, table.id!)} className="h-8 w-8 p-0 text-slate-600 hover:text-red-400">
                     <Trash2 size={14} />
@@ -338,7 +331,7 @@ export function ClientTablesPage() {
         })}
       </div>
 
-      {/* MODAL */}
+      {/* MODAL GESTIÓN - ESTILO ORIGINAL PRESERVADO */}
       <AnimatePresence>
         {selectedTable && (
           <Modal isOpen={!!selectedTable} onClose={() => setSelectedTable(null)} title={selectedTable.name}>
@@ -359,7 +352,7 @@ export function ClientTablesPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[60vh] md:h-[400px]">
-                {/* EN LA MESA */}
+                {/* COLUMNA 1: EN LA MESA */}
                 <div className="flex flex-col border border-slate-800 rounded-2xl bg-slate-950 overflow-hidden">
                   <div className="p-3 bg-slate-900 border-b border-slate-800 font-bold text-[10px] text-slate-500 uppercase tracking-widest">En esta mesa</div>
                   <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -368,7 +361,7 @@ export function ClientTablesPage() {
                         <div className="flex items-center gap-3">
                           {m.status === 'confirmed' ? <CheckCircle2 size={16} className="text-green-500" /> : m.status === 'pending' ? <Clock size={16} className="text-yellow-500" /> : <UserX size={16} className="text-red-400" />}
                           <div className="min-w-0">
-                            <p className={cn("text-sm font-bold truncate", m.status === 'declined' && "line-through text-slate-500")}>{m.name}</p>
+                            <p className={cn("text-sm font-bold truncate text-white", m.status === 'declined' && "line-through text-slate-500")}>{m.name}</p>
                             <p className="text-[10px] text-slate-500 truncate uppercase">{m.familyName}</p>
                           </div>
                         </div>
@@ -378,7 +371,7 @@ export function ClientTablesPage() {
                   </div>
                 </div>
                 
-                {/* SIN MESA (AHORA INCLUYE PENDIENTES) */}
+                {/* COLUMNA 2: SIN MESA */}
                 <div className="flex flex-col border border-slate-800 rounded-2xl bg-slate-950 overflow-hidden">
                   <div className="p-3 bg-slate-900 border-b border-slate-800 font-bold text-[10px] text-slate-500 uppercase tracking-widest">Sin asignar (Conf. o Pend.)</div>
                   <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -387,7 +380,6 @@ export function ClientTablesPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                              <p className="text-sm font-bold text-white truncate">{m.name}</p>
-                             {/* Badge para diferenciar pendientes */}
                              {m.status === 'pending' && <span className="text-[8px] bg-yellow-500/20 text-yellow-500 px-1 rounded">PEND</span>}
                           </div>
                           <p className="text-[10px] text-slate-500 uppercase">{m.familyName}</p>
@@ -401,17 +393,20 @@ export function ClientTablesPage() {
                   </div>
                 </div>
               </div>
-              <Button onClick={() => setSelectedTable(null)} className="w-full h-12 rounded-xl bg-slate-800">Cerrar</Button>
+              <Button onClick={() => setSelectedTable(null)} className="w-full h-12 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">Cerrar</Button>
             </div>
           </Modal>
         )}
       </AnimatePresence>
 
+      {/* MODAL CREAR MESA */}
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Nueva Mesa">
         <form onSubmit={handleCreateTable} className="space-y-6">
-          <div className="space-y-2"><Label>Nombre</Label><Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-slate-950 border-slate-800" /></div>
-          <div className="space-y-2"><Label>Capacidad</Label><Input type="number" min="1" required value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="bg-slate-950 border-slate-800" /></div>
-          <Button type="submit" disabled={loading} className="w-full h-14 rounded-2xl font-bold">Crear Mesa</Button>
+          <div className="space-y-2"><Label>Nombre</Label><Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-slate-950 border-slate-800 text-white" /></div>
+          <div className="space-y-2"><Label>Capacidad</Label><Input type="number" min="1" required value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="bg-slate-950 border-slate-800 text-white" /></div>
+          <Button type="submit" disabled={loading} className="w-full h-14 rounded-2xl font-bold bg-purple-600 hover:bg-purple-500 text-white">
+            {loading ? "Creando..." : "Crear Mesa"}
+          </Button>
         </form>
       </Modal>
     </div>

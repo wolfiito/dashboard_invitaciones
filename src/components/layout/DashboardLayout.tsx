@@ -1,8 +1,8 @@
-// src/components/layout/DashboardLayout.tsx
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { ADMIN_NAV, CLIENT_NAV } from '@/config/navigation';
-import { Menu } from 'lucide-react'; // Importamos icono de menú
+import { Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -13,37 +13,32 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navConfig = {
-    admin: {
-      items: ADMIN_NAV,
-      title: "Event",
-      subtitle: "OS"
-    },
-    client: {
-      items: CLIENT_NAV,
-      title: "Gestor",
-      subtitle: "Boda"
-    }
+    admin: { items: ADMIN_NAV, title: "Event", subtitle: "OS" },
+    client: { items: CLIENT_NAV, title: "Gestor", subtitle: "Boda" }
   };
 
   const currentNav = navConfig[role];
 
   return (
-    <div className="min-h-screen text-black font-sans flex flex-col lg:flex-row">
+    // Eliminamos text-black y usamos el fondo semántico
+    <div className="min-h-screen bg-background text-foreground font-sans flex flex-col lg:flex-row">
       
-      {/* HEADER MÓVIL (Solo visible en pantallas pequeñas) */}
-      <header className="lg:hidden sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-primary">
-          {currentNav.title}<span className="text-white">{currentNav.subtitle}</span>
+      {/* HEADER MÓVIL: Ahora con Glassmorphism real */}
+      <header className="lg:hidden sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border p-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-tighter text-primary">
+          {currentNav.title}<span className="text-foreground">{currentNav.subtitle}</span>
         </h1>
-        <button 
+        <Button 
+          variant="ghost" 
+          size="icon"
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 text-slate-300 hover:bg-slate-800 rounded-lg active:scale-95 transition-transform"
+          className="text-muted-foreground"
         >
           <Menu size={24} />
-        </button>
+        </Button>
       </header>
 
-      {/* SIDEBAR RESPONSIVO */}
+      {/* SIDEBAR: Lo inyectamos con las nuevas props */}
       <Sidebar 
         items={currentNav.items} 
         title={currentNav.title} 
@@ -52,10 +47,9 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* CONTENIDO PRINCIPAL */}
-      {/* En móvil: ml-0 (sin margen). En Desktop: lg:ml-64 (espacio para sidebar) */}
-      <main className="flex-1 w-full transition-all duration-300 lg:ml-64 p-4 md:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+      {/* CONTENIDO PRINCIPAL: Optimizado para lectura y espaciado */}
+      <main className="flex-1 w-full lg:ml-64 transition-all duration-300">
+        <div className="max-w-5xl mx-auto p-6 md:p-10 min-h-screen">
           {children}
         </div>
       </main>
