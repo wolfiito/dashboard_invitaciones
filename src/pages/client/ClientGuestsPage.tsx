@@ -13,8 +13,7 @@ import {
   PlusCircle, 
   ArrowLeft,
   Link, 
-  CopyCheck,
-  MoreVertical
+  CopyCheck
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { guestService, GuestData, GuestType, GuestMember } from "@/services/guestService";
