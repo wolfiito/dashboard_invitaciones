@@ -110,7 +110,7 @@ export function ClientLoginPage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground font-medium px-8">
-          ¿Problemas para entrar? Contacta a tu organizador o revisa el correo de invitación.
+          ¿Problemas para entrar? Contacta a tu proveedor.
         </p>
       </div>
     </div>
