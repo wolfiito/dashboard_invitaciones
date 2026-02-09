@@ -1,91 +1,107 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { KeyRound, ArrowRight, Loader2 } from "lucide-react";
+import { KeyRound, ArrowRight, Loader2, HeartHandshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { eventService } from "@/services/eventService";
+import { useAuthStore } from "@/store/useAuthStore";
+import { toast } from "sonner";
 
 export function ClientLoginPage() {
   const navigate = useNavigate();
+  
+  // CORRECCIÓN: Usamos 'setClientAuth' que es el nombre real en tu store
+  const { setClientAuth } = useAuthStore(); 
+  
   const [token, setToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    if (!token.trim()) return;
+    
     setIsLoading(true);
 
     try {
-      // 1. Validamos el token en Firebase
+      // 1. Validamos token en Firebase
       const event = await eventService.loginWithToken(token.trim());
       
-      // 2. Si es válido, guardamos el ID en el navegador
-      if (event.id) {
-        localStorage.setItem("clientEventId", event.id);
-        // 3. Redirigimos al Dashboard del Cliente
+      if (event && event.id) {
+        // 2. Guardamos en el Store usando la función correcta
+        setClientAuth(event);
+        
+        // 3. Feedback y Redirección
+        toast.success(`¡Bienvenido a ${event.name}!`);
         navigate("/client/dashboard");
+      } else {
+        toast.error("Código inválido. Verifica e intenta de nuevo.");
       }
       
     } catch (err) {
-      // CORRECCIÓN: Tipado seguro de errores
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Código incorrecto o error desconocido.");
-      }
+      console.error(err);
+      toast.error("Error de conexión o código incorrecto.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      
+      {/* Elementos decorativos de fondo (burbujas pastel) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-md w-full space-y-8 relative z-10">
         
-        {/* Logo o Branding */}
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-primary tracking-tight">
-            Event<span className="text-white">OS</span>
+        {/* Branding Amigable */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-lg mb-4 text-primary">
+             <HeartHandshake size={32} />
+          </div>
+          <h1 className="text-4xl font-black text-foreground tracking-tight">
+            Tu Evento
           </h1>
-          <p className="mt-2 text-secondary">
-            Bienvenido. Ingresa tu código de acceso para gestionar tu evento.
+          <p className="text-muted-foreground font-medium">
+            Ingresa tu código de invitado para gestionar tu boda o evento.
           </p>
         </div>
 
-        <Card className="border-slate-700/50 bg-slate-900/50 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-center text-lg">Acceso a Clientes</CardTitle>
+        <Card className="border-border bg-white/80 backdrop-blur-xl shadow-2xl shadow-primary/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-center text-lg font-bold text-foreground">Acceso Privado</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-6">
               
               <div className="space-y-2">
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-3 h-4 w-4 text-secondary" />
+                <div className="relative group">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input 
-                    placeholder="Pega tu código aquí..." 
-                    className="pl-9 h-12 text-lg bg-surface border-slate-700"
+                    placeholder="Ej: ABC-123-XYZ" 
+                    className="pl-10 h-14 text-lg bg-white border-input focus:ring-2 focus:ring-primary/20 transition-all text-center font-mono tracking-widest uppercase text-foreground placeholder:text-muted-foreground/50"
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     required
+                    autoFocus
                   />
                 </div>
-                {error && (
-                  <p className="text-sm text-red-400 font-medium animate-in fade-in">
-                    {error}
-                  </p>
-                )}
               </div>
 
-              <Button className="w-full h-12 text-base" disabled={isLoading}>
+              <Button 
+                className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]" 
+                disabled={isLoading}
+              >
                 {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Validando...
+                  </>
                 ) : (
                   <>
-                    Ingresar al Evento
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    Ingresar ahora
+                    <ArrowRight className="w-5 h-5 ml-2" />
                   </>
                 )}
               </Button>
@@ -93,8 +109,8 @@ export function ClientLoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-secondary/50">
-          ¿No tienes tu código? Contacta a tu organizador.
+        <p className="text-center text-xs text-muted-foreground font-medium px-8">
+          ¿Problemas para entrar? Contacta a tu organizador o revisa el correo de invitación.
         </p>
       </div>
     </div>

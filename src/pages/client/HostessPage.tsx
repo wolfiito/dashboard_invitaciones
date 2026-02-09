@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { guestService, GuestData } from "@/services/guestService";
 import { tableService, TableData } from "@/services/tableService";
 import { useAuthStore } from "@/store/useAuthStore";
+import { cn } from "@/lib/utils";
 
 export function HostessPage() {
   const navigate = useNavigate();
@@ -97,14 +98,14 @@ export function HostessPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground font-sans flex flex-col overflow-hidden">
       
       {/* HEADER */}
-      <div className="p-4 flex items-center gap-4 bg-slate-900 border-b border-slate-800 z-10 shrink-0">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/client/dashboard")} className="text-slate-400">
+      <div className="p-4 flex items-center gap-4 bg-white border-b border-border z-10 shrink-0 shadow-sm">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/client/dashboard")} className="text-muted-foreground hover:bg-secondary">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-lg font-bold">Modo Hostess</h1>
+        <h1 className="text-lg font-bold text-foreground">Modo Hostess</h1>
       </div>
 
       <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -118,40 +119,42 @@ export function HostessPage() {
                   styles={{ container: { width: "100%", height: "100%" } }}
               />
               <div className="absolute inset-0 border-2 border-white/30 pointer-events-none flex items-center justify-center">
-                 <div className="w-64 h-64 border-2 border-primary rounded-lg animate-pulse bg-primary/10"></div>
+                 <div className="w-64 h-64 border-2 border-primary rounded-lg animate-pulse bg-primary/20"></div>
               </div>
-              <p className="absolute bottom-10 text-white/80 bg-black/50 px-4 py-2 rounded-full text-sm z-20">
+              <p className="absolute bottom-10 text-white font-medium bg-black/60 backdrop-blur-md px-6 py-3 rounded-full text-sm z-20 shadow-lg">
                 Apunta al código QR
               </p>
            </div>
         ) : (
-           /* ZONA DE RESULTADOS - Padding reducido para móviles */
-           <div className="flex-1 bg-slate-950 p-4 flex flex-col items-center justify-center overflow-y-auto">
+           /* ZONA DE RESULTADOS - ADAPTADA A TEMA CLARO */
+           <div className="flex-1 bg-background p-4 flex flex-col items-center justify-center overflow-y-auto">
               
-              {loading && <div className="text-center text-slate-400 animate-pulse">Procesando...</div>}
+              {loading && <div className="text-center text-muted-foreground animate-pulse font-medium">Procesando...</div>}
 
               {error && (
-                <div className="text-center space-y-4 animate-in fade-in zoom-in duration-300">
-                   <XCircle className="w-16 h-16 text-red-500 mx-auto" />
-                   <h2 className="text-xl font-bold text-red-400">¡Error!</h2>
-                   <p className="text-slate-400 text-sm px-4">{error}</p>
-                   <Button onClick={resetScanner} className="w-full mt-4 bg-slate-800">Escanear otro</Button>
+                <div className="text-center space-y-4 animate-in fade-in zoom-in duration-300 bg-white p-8 rounded-3xl shadow-xl border border-border">
+                   <XCircle className="w-16 h-16 text-destructive mx-auto" />
+                   <h2 className="text-xl font-bold text-destructive">¡Error!</h2>
+                   <p className="text-muted-foreground text-sm px-4">{error}</p>
+                   <Button onClick={resetScanner} className="w-full mt-4" variant="outline">Escanear otro</Button>
                 </div>
               )}
 
               {guest && !loading && !error && (
-                <Card className="w-full max-w-md bg-slate-900 border-slate-800 text-white shadow-2xl animate-in slide-in-from-bottom-5 duration-500">
-                   <CardHeader className={`text-center border-b border-slate-800 pb-4 ${
-                       guest.hasArrived && !justCheckedIn ? "bg-yellow-500/10" : justCheckedIn ? "bg-green-500/10" : ""
-                   }`}>
-                      <p className="text-xs text-slate-400 uppercase tracking-widest mb-1 font-bold">
+                <Card className="w-full max-w-md bg-white border-border text-foreground shadow-2xl animate-in slide-in-from-bottom-5 duration-500">
+                   <CardHeader className={cn("text-center border-b border-border pb-4", 
+                       guest.hasArrived && !justCheckedIn ? "bg-yellow-50" : justCheckedIn ? "bg-green-50" : "bg-white"
+                   )}>
+                      <p className={cn("text-xs uppercase tracking-widest mb-1 font-bold",
+                          guest.hasArrived && !justCheckedIn ? "text-yellow-600" : justCheckedIn ? "text-green-600" : "text-muted-foreground"
+                      )}>
                         {guest.hasArrived ? "⚠️ YA REGISTRADO" : "ACCESO AUTORIZADO"}
                       </p>
-                      <CardTitle className="text-2xl font-bold text-white truncate px-2">
+                      <CardTitle className="text-2xl font-black text-foreground truncate px-2">
                         {guest.familyName}
                       </CardTitle>
                       <div className="flex justify-center gap-2 mt-2">
-                         <span className="inline-flex items-center px-3 py-1 rounded-full bg-slate-800 text-xs font-medium border border-slate-700">
+                         <span className="inline-flex items-center px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-bold border border-border">
                             <Users className="w-3 h-3 mr-2 text-primary" />
                             {guest.members.length} Personas
                          </span>
@@ -160,11 +163,11 @@ export function HostessPage() {
 
                    <CardContent className="pt-4 space-y-5">
                       
-                      {/* --- LISTA OPTIMIZADA (MOBILE FIRST) --- */}
+                      {/* --- LISTA OPTIMIZADA --- */}
                       <div className="space-y-2">
                          <div className="flex items-center justify-between px-1">
-                            <p className="text-xs font-bold text-slate-500 uppercase">Lista de Invitados</p>
-                            <span className="text-[10px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            <p className="text-xs font-bold text-muted-foreground uppercase">Lista de Invitados</p>
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
                                 {guest.members.filter(m => m.isConfirmed).length} Confirmados
                             </span>
                          </div>
@@ -173,42 +176,42 @@ export function HostessPage() {
                             {guest.members.map((m, i) => {
                                 const tableName = getTableName(m.tableId);
                                 
-                                // Configuración de estilos
+                                // Configuración de estilos para TEMA CLARO
                                 let statusStyle = {
-                                    bg: "bg-slate-950",
-                                    border: "border-slate-800",
-                                    iconColor: "text-slate-500",
-                                    iconBg: "bg-slate-900",
-                                    textColor: "text-slate-300",
-                                    subTextColor: "text-slate-500",
+                                    bg: "bg-white",
+                                    border: "border-border",
+                                    iconColor: "text-muted-foreground",
+                                    iconBg: "bg-secondary",
+                                    textColor: "text-foreground font-medium",
+                                    subTextColor: "text-muted-foreground",
                                     Icon: Armchair,
                                     badgeText: "Sin Mesa Asignada",
-                                    badgeClass: "text-yellow-600"
+                                    badgeClass: "text-yellow-600 font-bold bg-yellow-50 px-2 py-0.5 rounded"
                                 };
 
                                 if (!m.isConfirmed) {
                                     statusStyle = {
-                                        bg: "bg-red-950/10",
-                                        border: "border-red-900/20",
-                                        iconColor: "text-red-500/70",
-                                        iconBg: "bg-red-950/30",
-                                        textColor: "text-slate-500 line-through decoration-red-900/50",
-                                        subTextColor: "text-red-500/50",
+                                        bg: "bg-red-50",
+                                        border: "border-red-100",
+                                        iconColor: "text-red-400",
+                                        iconBg: "bg-red-100",
+                                        textColor: "text-muted-foreground line-through decoration-red-300",
+                                        subTextColor: "text-red-400",
                                         Icon: UserX,
                                         badgeText: "Canceló asistencia",
-                                        badgeClass: "text-red-500/70"
+                                        badgeClass: "text-red-500 font-bold"
                                     };
                                 } else if (tableName) {
                                     statusStyle = {
-                                        bg: "bg-slate-950",
-                                        border: "border-green-900/30 shadow-[inset_0_0_10px_rgba(74,222,128,0.05)]",
-                                        iconColor: "text-green-400",
-                                        iconBg: "bg-green-950/30",
-                                        textColor: "text-white font-medium",
-                                        subTextColor: "text-green-400",
+                                        bg: "bg-green-50/50",
+                                        border: "border-green-200 shadow-sm",
+                                        iconColor: "text-green-600",
+                                        iconBg: "bg-green-100",
+                                        textColor: "text-foreground font-bold",
+                                        subTextColor: "text-green-600",
                                         Icon: Armchair,
                                         badgeText: tableName,
-                                        badgeClass: "text-green-400 font-bold"
+                                        badgeClass: "text-green-700 font-black bg-green-100 px-2 py-0.5 rounded border border-green-200"
                                     };
                                 }
 
@@ -219,17 +222,14 @@ export function HostessPage() {
                                     key={i} 
                                     className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${statusStyle.bg} ${statusStyle.border}`}
                                   >
-                                      {/* Icono fijo a la izquierda */}
                                       <div className={`p-2 rounded-full shrink-0 ${statusStyle.iconBg} ${statusStyle.iconColor}`}>
                                           <StatusIcon className="w-4 h-4" />
                                       </div>
-
-                                      {/* Texto apilado (Stack) para evitar scroll horizontal */}
                                       <div className="flex-1 min-w-0 flex flex-col justify-center">
                                           <p className={`text-sm truncate ${statusStyle.textColor}`}>
                                             {m.name}
                                           </p>
-                                          <p className={`text-xs truncate mt-0.5 ${statusStyle.badgeClass}`}>
+                                          <p className={`text-xs truncate mt-1 w-fit ${statusStyle.badgeClass}`}>
                                             {statusStyle.badgeText}
                                           </p>
                                       </div>
@@ -243,7 +243,7 @@ export function HostessPage() {
                       <div className="space-y-3 pt-2">
                         {!justCheckedIn ? (
                             <Button 
-                                className="w-full h-14 text-lg font-bold bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 active:scale-[0.98] transition-all"
+                                className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 active:scale-[0.98] transition-all rounded-xl"
                                 onClick={handleCheckIn}
                                 disabled={guest.hasArrived} 
                             >
@@ -252,11 +252,11 @@ export function HostessPage() {
                         ) : (
                             <div className="text-center py-2 animate-in zoom-in duration-300">
                                 <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-2" />
-                                <p className="text-lg font-bold text-green-500">¡Bienvenidos!</p>
+                                <p className="text-lg font-bold text-green-600">¡Bienvenidos!</p>
                             </div>
                         )}
 
-                        <Button variant="ghost" onClick={resetScanner} className="w-full h-12 text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-800">
+                        <Button variant="outline" onClick={resetScanner} className="w-full h-12 border-dashed border-muted-foreground/30 text-muted-foreground hover:text-foreground hover:bg-secondary hover:border-border rounded-xl">
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Escanear Siguiente
                         </Button>
