@@ -1,49 +1,63 @@
-import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
-import { createPortal } from 'react-dom';
-import { cn } from '@/lib/utils'; // <--- Ahora sí lo usaremos abajo
-import { Button } from './button';
+import { X } from "lucide-react";
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title?: string;
   children: React.ReactNode;
-  className?: string; // Agregamos esto para permitir estilos extra
 }
 
-export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      {/* Overlay con blur y oscurecimiento suave */}
       <div 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-all" 
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
         onClick={onClose}
       />
-      
-      {/* Usamos 'cn' aquí para mezclar las clases base con cualquier clase extra que mandemos */}
+
+      {/* Contenedor del Modal */}
       <div className={cn(
-        "relative w-full max-w-md bg-surface border border-slate-700 rounded-xl shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200",
-        className
+        "relative w-full bg-white rounded-3xl shadow-2xl transform transition-all",
+        // En móvil: full width, bottom-sheet style si quisieras, pero standard modal es mejor
+        "max-w-lg md:max-w-3xl lg:max-w-4xl", // Anchos máximos controlados
+        "flex flex-col max-h-[90vh]", // Altura máxima para evitar desbordes verticales
+        "animate-in fade-in zoom-in-95 duration-200"
       )}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-text">{title}</h3>
-          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
         
-        {children}
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">
+            {title}
+          </h2>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content (Scrollable) */}
+        <div className="p-6 overflow-y-auto">
+          {children}
+        </div>
       </div>
     </div>,
     document.body

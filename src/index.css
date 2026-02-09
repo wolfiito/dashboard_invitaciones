@@ -4,38 +4,39 @@
  
 @layer base {
   :root {
-    /* Fondo Blanco Puro */
-    --background: 0 0% 100%;
-    /* Texto Gris Oscuro (Casi negro) para lectura cómoda */
-    --foreground: 240 10% 3.9%;
+    /* Fondo: Un rosa un poco más definido para que contraste con el blanco */
+    /* Hue 340 (Rosa), Saturation 30%, Lightness 96% */
+    --background: 340 30% 96%;
+    
+    /* Texto Principal: Gris muy oscuro (casi negro) */
+    --foreground: 240 10% 15%;
  
-    /* Tarjetas Blancas con borde sutil */
+    /* Tarjetas: Blanco Puro */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 240 10% 15%; /* Texto dentro de cards OSCURO */
  
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 240 10% 15%;
  
-    /* Primary: Un tono elegante (puedes cambiarlo a tu gusto) */
-    /* Actualmente: Violeta Profundo */
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary: Rosa Intenso (para botones y acentos) */
+    --primary: 340 60% 65%;
+    --primary-foreground: 0 0% 100%; /* Texto blanco sobre botón rosa */
  
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 20%;
  
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
  
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 340 30% 96%; /* Color de hover similar al fondo */
+    --accent-foreground: 240 6% 20%;
  
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
  
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 262.1 83.3% 57.8%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 340 60% 65%;
  
     --radius: 0.75rem;
   }
@@ -46,6 +47,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-slate-50 text-foreground antialiased; /* Fondo gris muy pálido para que resalten las cards blancas */
+    @apply bg-background text-foreground antialiased;
   }
 }
